@@ -1,6 +1,6 @@
 # Antigravity for Android
 
-Antigravity v2.33.0 (Linux ARM64) running **natively on Android (Bionic)**, with no PRoot or chroot. Includes a multi-provider AI gateway, voice mode, and a built-in web terminal.
+Run the **Antigravity AI coding agent on Android** (ARM64 APK). Antigravity v2.33.0 (Linux ARM64) runs **natively on Android (Bionic)**, with no PRoot or chroot. Includes a multi-provider AI gateway (Gemini, OpenAI, Claude), voice mode, and a built-in web terminal.
 
 [![Release](https://img.shields.io/github/v/release/Comzvy/antigravity-arm64-android?style=flat-square&color=38bdf8)](https://github.com/Comzvy/antigravity-arm64-android/releases/latest)
 ![Android](https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=flat-square)
