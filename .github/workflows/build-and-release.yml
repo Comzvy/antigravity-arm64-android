@@ -58,6 +58,7 @@ jobs:
 
       - name: Prepare Vendor Inputs & Signing Keystore
         env:
+          GH_TOKEN: ${{ github.token }}
           VENDOR_URL: ${{ inputs.vendor_url || secrets.VENDOR_DOWNLOAD_URL }}
         run: |
           mkdir -p tools env/bootstrap modules/core/pristine
@@ -65,12 +66,13 @@ jobs:
           # 1. Hydrate Bionic bootstrap if absent
           if [ ! -f "env/bootstrap/bootstrap.tar.gz" ] && [ ! -f "env/bootstrap/bootstrap-aarch64.zip" ]; then
             echo "[CI] Hydrating bootstrap.tar.gz from v2.33.0 release..."
-            if curl -fsSL -o /tmp/prev-release.apk "https://github.com/Comzvy/antigravity-arm64-android/releases/download/v2.33.0/antigravity.apk"; then
-              python3 -c "import zipfile, shutil; z=zipfile.ZipFile('/tmp/prev-release.apk'); shutil.copyfileobj(z.open('assets/env/bootstrap/bootstrap.tar.gz'), open('env/bootstrap/bootstrap.tar.gz','wb'))"
-              rm -f /tmp/prev-release.apk
+            if gh release download v2.33.0 -p antigravity.apk -D /tmp --clobber; then
+              python3 -c "import zipfile, shutil; z=zipfile.ZipFile('/tmp/antigravity.apk'); shutil.copyfileobj(z.open('assets/env/bootstrap/bootstrap.tar.gz'), open('env/bootstrap/bootstrap.tar.gz','wb'))"
+              rm -f /tmp/antigravity.apk
             else
               echo "[CI] Fallback: downloading Termux bootstrap-aarch64.zip..."
-              curl -fsSL -o env/bootstrap/bootstrap-aarch64.zip "https://github.com/termux/termux-packages/releases/download/bootstrap-2024.11.17-r1%2Bapt.android-7/bootstrap-aarch64.zip"
+              gh release download -R termux/termux-packages -p bootstrap-aarch64.zip -D env/bootstrap --clobber || \
+              curl -fsSL -o env/bootstrap/bootstrap-aarch64.zip "https://github.com/termux/termux-packages/releases/latest/download/bootstrap-aarch64.zip"
             fi
           fi
 
