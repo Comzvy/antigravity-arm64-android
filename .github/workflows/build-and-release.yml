@@ -62,15 +62,16 @@ jobs:
         run: |
           mkdir -p tools env/bootstrap modules/core/pristine
 
-          # 1. Hydrate Bionic bootstrap and Android build jars if absent
-          if [ ! -f "env/bootstrap/bootstrap-aarch64.zip" ] || [ ! -f "tools/android.jar" ] || [ ! -f "tools/r8.jar" ]; then
-            echo "[CI] Hydrating bootstrap and build tools from Comzvy/antigravity-android..."
-            rm -rf /tmp/agy-base
-            git clone --depth 1 https://github.com/Comzvy/antigravity-android.git /tmp/agy-base
-            [ -f "env/bootstrap/bootstrap-aarch64.zip" ] || cp -f /tmp/agy-base/env/bootstrap/bootstrap-aarch64.zip env/bootstrap/bootstrap-aarch64.zip
-            [ -f "tools/android.jar" ] || cp -f /tmp/agy-base/tools/android.jar tools/android.jar
-            [ -f "tools/r8.jar" ] || cp -f /tmp/agy-base/tools/r8.jar tools/r8.jar
-            rm -rf /tmp/agy-base
+          # 1. Hydrate Bionic bootstrap if absent
+          if [ ! -f "env/bootstrap/bootstrap.tar.gz" ] && [ ! -f "env/bootstrap/bootstrap-aarch64.zip" ]; then
+            echo "[CI] Hydrating bootstrap.tar.gz from v2.33.0 release..."
+            if curl -fsSL -o /tmp/prev-release.apk "https://github.com/Comzvy/antigravity-arm64-android/releases/download/v2.33.0/antigravity.apk"; then
+              python3 -c "import zipfile, shutil; z=zipfile.ZipFile('/tmp/prev-release.apk'); shutil.copyfileobj(z.open('assets/env/bootstrap/bootstrap.tar.gz'), open('env/bootstrap/bootstrap.tar.gz','wb'))"
+              rm -f /tmp/prev-release.apk
+            else
+              echo "[CI] Fallback: downloading Termux bootstrap-aarch64.zip..."
+              curl -fsSL -o env/bootstrap/bootstrap-aarch64.zip "https://github.com/termux/termux-packages/releases/download/bootstrap-2024.11.17-r1%2Bapt.android-7/bootstrap-aarch64.zip"
+            fi
           fi
 
           # 2. Hydrate pristine Antigravity v2.33.0 Linux ARM64 language_server if absent
@@ -92,14 +93,18 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-          # 4. Setup Android API 28 android.jar fallback if still absent
+          # 4. Setup Android API 34 android.jar if absent (required for values-v31 splash attributes)
           if [ ! -f "tools/android.jar" ]; then
-            echo "[CI] Fetching android.jar (API 28)..."
-            curl -fsSL -o tools/android.jar "https://github.com/Sable/android-platforms/raw/master/android-28/android.jar" || \
-            curl -fsSL -o tools/android.jar "https://raw.githubusercontent.com/iBotPeaches/platform_frameworks_base/master/android-28.jar"
+            echo "[CI] Fetching android.jar (API 34)..."
+            if curl -fsSL -o /tmp/platform-34.zip "https://dl.google.com/android/repository/platform-34-ext7_r03.zip"; then
+              python3 -c "import zipfile, shutil; z=zipfile.ZipFile('/tmp/platform-34.zip'); n=[x for x in z.namelist() if x.endswith('/android.jar')][0]; shutil.copyfileobj(z.open(n), open('tools/android.jar','wb'))"
+              rm -f /tmp/platform-34.zip
+            else
+              curl -fsSL -o tools/android.jar "https://github.com/Sable/android-platforms/raw/master/android-34/android.jar"
+            fi
           fi
 
-          # 5. Setup R8 / D8 compiler jar fallback if still absent
+          # 5. Setup R8 / D8 compiler jar if absent
           if [ ! -f "tools/r8.jar" ]; then
             echo "[CI] Fetching r8.jar..."
             curl -fsSL -o tools/r8.jar "https://dl.google.com/dl/android/maven2/com/android/tools/r8/8.2.42/r8-8.2.42.jar"
