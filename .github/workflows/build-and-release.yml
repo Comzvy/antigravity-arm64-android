@@ -30,7 +30,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Both Release Editions
+    name: Build Release APK
     runs-on: ubuntu-latest
 
     steps:
@@ -121,18 +121,14 @@ jobs:
             export AGY_HOME="$PWD/vendor"
           fi
 
-      - name: Build Standard Release APK (dist/antigravity.apk)
+      - name: Build Release APK (dist/antigravity.apk)
         run: |
           bash build.sh
-
-      - name: Build Region Bypass Release APK (dist/antigravity-region-bypass.apk)
-        run: |
-          bash build.sh --region-bypass
 
       - name: Compute Cryptographic Checksums
         run: |
           cd dist
-          sha256sum antigravity.apk antigravity-region-bypass.apk > SHA256SUMS.txt
+          sha256sum antigravity.apk > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Upload Build Artifacts
@@ -141,7 +137,6 @@ jobs:
           name: antigravity-binaries
           path: |
             dist/antigravity.apk
-            dist/antigravity-region-bypass.apk
             dist/SHA256SUMS.txt
 
       - name: Publish GitHub Release
@@ -155,39 +150,27 @@ jobs:
           make_latest: true
           files: |
             dist/antigravity.apk
-            dist/antigravity-region-bypass.apk
             dist/SHA256SUMS.txt
           body: |
-            <div align="center">
-              <h3>Antigravity for Android</h3>
-              <p>Autonomous AI Coding Environment &bull; Native Bionic Userspace &bull; ARM64</p>
-            </div>
+            ## Antigravity for Android
 
-            ---
+            Autonomous AI coding workstation running natively on Android ARM64 Bionic userspace.
 
-            ### Packages & Artifacts
+            ### Downloads
 
-            | Package | Description |
-            | :--- | :--- |
-            | **`antigravity.apk`** | Standard production release with native bionic engine (com.agy, port 45157) |
-            | **`antigravity-region-bypass.apk`** | Region bypass edition with account eligibility check bypass (com.agy, port 45157) |
-            | **`SHA256SUMS.txt`** | Cryptographic checksums for package integrity verification |
+            | Artifact | Package ID | Description |
+            | :--- | :--- | :--- |
+            | **`antigravity.apk`** | `com.agy` | Standard production release (`port 45157`) |
+            | **`SHA256SUMS.txt`** | — | SHA-256 checksum for package verification |
 
-            ---
+            ### Highlights
 
-            ### Key Highlights in this Release
-
-            * **Built-in Web Terminal & PTY Support (PR #19):** Enabled native built-in web terminal on Android userspace via length-preserving PTY shell binary patching (`/bin/bash` -> `/bin///sh`), resilient prioritized shell fallback hierarchy (`$PREFIX/bin/bash` -> `runtime/bin/bash` -> `/system/bin/sh`), and proper `TERM=xterm-256color` / `TERMINFO` environment configuration.
-            * **AAPT Build Reliability:** Fixed `aapt` crash with `SIGABRT (134)` on Android ARM64 userspace builds by ensuring `ANDROID_DATA` environment export.
-            * **Security Hardening (Issue #6):** Completely removed hardcoded `android:debuggable="true"` from production builds, preventing unauthorized access to OAuth credentials and internal user files via `run-as`. Dev builds now isolate debuggable flags to `--dev` builds.
-            * **Media & File Picker Overhaul (Issue #8):** Replaced SAF-only document picker with universal native Android chooser. Users can now attach photos, videos, and files directly from Gallery, Google Photos, or File Managers with automatic persistent URI permissions.
-            * **OAuth & Browser Redirection Streamlined:** Completely eliminated 80ms disk polling and temporary files. Direct stdout capture and clean native browser intent dispatching without AIDL overhead or IPC deadlocks.
-            * **ARMv8.0-A CPU Architecture & SIMD Emulation:** Added transparent atomic & SIMD emulation (`liblse_compat.so`) for FEAT_LSE, FEAT_RDM, and FEAT_FCMA, resolving `FATAL ERROR: This binary was compiled with lse enabled` and `SIGILL` crashes on Snapdragon 685 (Cortex-A53 / Redmi Note 12).
-            * **Torch / Flashlight Hardware Bridge:** Integrated hardware torch control bridge and CLI utility (`torch on/off`).
-            * **Integrated Log Export & Diagnostics:** Added "Copy Logs" and "Save Logs" actions to the startup failure splash overlay for one-tap troubleshooting.
-            * **Autonomous Background Micro-Daemon (`agy-daemon`):** Background task engine with triggers for delays, intervals, file watching, and GitHub notifications.
-
-            ---
+            - **Core v2.33.0 (Linux ARM64 Port):** Runs `language_server` natively in Android Bionic userspace with `wsTransport=3` WebSocket multiplexing and automatic agent stream resync.
+            - **Multi-Provider AI Gateway (BYOK):** Configure **Google Gemini**, **OpenAI**, **Anthropic Claude** (including custom Anthropic endpoints), **OpenRouter**, **Groq**, **DeepSeek**, or custom OpenAI-compatible servers.
+            - **Voice Mode & AudioWorklet:** Real-time `SpeechRecognizer`, `RecognizerIntent` fallback, 16 kHz PCM WebAudio capture with AudioWorklet CSP support, cloud Whisper/Gemini transcription, and native TTS.
+            - **Built-in Web Terminal & PTY Support:** Native shell execution (`$PREFIX/bin/bash` -> `runtime/bin/bash` -> `/system/bin/sh`) with `xterm-256color` terminfo.
+            - **ARMv8.0-A Compatibility (`liblse_compat.so`):** Transparent atomic & SIMD emulation for FEAT_LSE, FEAT_RDM, and FEAT_FCMA on older ARMv8.0-A SoCs.
+            - **Android Native Integrations:** Dynamic Dark/Light theme sync, Keep Screen Awake, background/lockscreen persistence (`PARTIAL_WAKE_LOCK` + `WIFI_MODE_FULL_LOW_LATENCY`), universal media/file picker, Shizuku (`rish`) elevated shell, `agy-daemon`, and `pkg` package manager.
 
             > [!NOTE]
-            > **Seamless Upgrades:** Built with the consistent embedded signing keystore. You can install this update directly over previous v2.x releases without uninstalling or losing local projects.
+            > **Seamless Upgrades:** Signed with the repository keystore so you can install directly over previous `v2.x` releases without losing local data.
