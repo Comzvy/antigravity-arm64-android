@@ -112,7 +112,7 @@ web/
 | **`patches/web_optimizations.js`** | IIFE | ~2.2 KB | Ликвидация 300мс задержки тапа, фиксация высоты `--agy-vvh` при открытии IME, GPU-композитинг. |
 | **`patches/touch_model_menu.js`** | IIFE | ~6.7 KB | Адаптация hover-меню выбора моделей Base UI под сенсорный ввод. |
 | **`patches/theme_sync.js`** | IIFE | ~4.7 KB | MutationObserver за классами `<html>`/`<body>` и передача смены темы в нативный Android. |
-| **`patches/ai_models_menu.js`** | IIFE | ~48 KB | Модальное меню и встроенные карточки управления провайдерами ИИ, API-ключами и каталогом моделей (BYOK). |
+| **`patches/ai_models_menu.js`** | IIFE | ~55 KB | Модальное меню и встроенные карточки управления провайдерами ИИ, API-ключами, кастомными эндпоинтами Anthropic (`/v1/messages`) / OpenAI / Gemini, кастомными HTTP-заголовками и каталогом моделей (BYOK). |
 | **`patches/voice_input.js`** | IIFE | ~19 KB | Мост голосового ввода (`window.__agVoiceBridge`), потоковая транскрипция речи Android `SpeechRecognizer` + WebAudio/Whisper/Gemini фоллбэк и полифиллы `SpeechRecognition` / `speechSynthesis`. |
 | **`patches/startup_ready.js`** | IIFE | ~4.7 KB | Детектор первого полезного рендера DOM и перехватчик JS-ошибок для `AndroidBridge`. |
 | **`main.js`** | Raw + Patch | ~9.5 MB | Рабочий бандл React UI, пропатченный скриптом `patch_main.py`. |

@@ -131,7 +131,8 @@ graph TD
 | `/gateway/logs` | `SystemGatewayServer` | Чтение последних строк системного лога из кольцевого буфера памяти. |
 | `/gateway/commands` | `SystemGatewayServer` | История выполненных шлюзом команд и их статусов. |
 | `/gateway/crash` | `SystemGatewayServer` | Диагностический снимок последнего падения ядра. |
-| `/v1/chat/completions` | `AiModelManager` | Локальный Multi-Provider роутер для маршрутизации запросов к моделям различных AI-провайдеров по их API-ключам. |
+| `/v1/chat/completions` | `AiModelManager` | Локальный Multi-Provider роутер для маршрутизации запросов к моделям различных AI-провайдеров по их API-ключам (включая автоматическую трансляцию OpenAI <-> Anthropic `/v1/messages` со стримингом SSE, tool calls, thinking и мультимодальными изображениями). |
+| `/v1/messages` | `AiModelManager` | Прямой прокси нативного протокола Anthropic Messages API (`/v1/messages`) к выбранному провайдеру Anthropic или кастомному Anthropic-совместимому эндпоинту. |
 
 ### 2.4. Безопасность и JavaScript Bridge (`com.agy.bridge`)
 
@@ -156,8 +157,10 @@ graph TD
 ### 2.6. Управление провайдерами ИИ, API-ключами и моделями (`com.agy.ai`)
 
 - **`AiModelManager`**:
-  - Хранит пользовательские настройки провайдеров ИИ, API-ключей и списков моделей в `SharedPreferences` (`agy_ai_models_prefs`).
-  - Поддерживает встроенные пресеты для **Google Gemini API** (протокол `genai`), **OpenRouter**, **OpenAI**, **Anthropic Claude**, **DeepSeek**, **Groq Cloud**, **xAI (Grok)**, **Mistral AI**, **Custom Endpoint / Local LLM** (протокол `openai`/`genai`) и объединённый режим **Multi-Provider**.
+  - Хранит пользовательские настройки провайдеров ИИ, API-ключей, кастомных HTTP-заголовков (`customHeaders`) и списков моделей в `SharedPreferences` (`agy_ai_models_prefs`).
+  - Поддерживает встроенные пресеты для **Google Gemini API** (протокол `genai`), **OpenRouter**, **OpenAI**, **Anthropic Claude** (протокол `anthropic`), **Custom Anthropic** (`custom_anthropic`, протокол `anthropic` для кастомных `/v1/messages` прокси/релеев), **DeepSeek**, **Groq Cloud**, **xAI (Grok)**, **Mistral AI**, **Custom Endpoint / Local LLM** (протоколы `openai` / `anthropic` / `genai`) и объединённый режим **Multi-Provider**.
+  - Реализует двусторонний транслятор протоколов OpenAI `/v1/chat/completions` <-> Anthropic `/v1/messages` (`proxyAnthropicMessages`, `convertOpenAiToAnthropicRequest`, `streamAnthropicSseToOpenAi`), позволяя Go-ядру `language_server` прозрачно работать с нативными эндпоинтами Anthropic (включая потоковый SSE, вызовы инструментов `tool_use`/`tool_result`, блоки размышлений `thinking` и изображения).
+  - Поддерживает автоматическое зондирование (`probeAnthropicEndpoint` / `probeOpenAiEndpoint`) при проверке API-ключа и кастомного эндпоинта, если прокси-сервер не реализует `GET /v1/models`.
   - Перед запуском `language_server` синхронизирует `$HOME/.antigravity/settings.json` (Tier 1 каталог моделей `models.list` и настройки `gateway`) и инжектирует переменные окружения `AGY_LLM_GATEWAY_URL`, `AGY_LLM_GATEWAY_WIRE_PROTOCOL`, `AGY_LLM_GATEWAY_API_KEY` и `GEMINI_API_KEY` через `CoreEnvironment`.
   - При сохранении новых настроек вызывает `CoreServerService.restartCore()`, который через `CoreProcessSupervisor.restart()` мгновенно перезапускает процесс `language_server` без задержки backoff.
   - Реализует облачный фоллбэк распознавания речи `transcribeAudio()` через мультимодальный `generateContent` Google Gemini API, Groq Whisper (`whisper-large-v3-turbo`) или OpenAI Whisper (`whisper-1`).

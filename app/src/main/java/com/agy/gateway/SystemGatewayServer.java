@@ -34,7 +34,11 @@ public final class SystemGatewayServer {
     private int port;
     private final GatewayDispatcher dispatcher;
     private final LogRingBuffer logBuffer;
-    private final ExecutorService executor = Executors.newFixedThreadPool(4);
+    private final ExecutorService executor = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "AgyGatewayWorker");
+        t.setDaemon(true);
+        return t;
+    });
 
     private volatile boolean running = false;
     private ServerSocket serverSocket;
@@ -113,7 +117,6 @@ public final class SystemGatewayServer {
              OutputStream out = sock.getOutputStream()) {
 
             // Read HTTP headers line by line from the raw stream
-            StringBuilder headerSb = new StringBuilder();
             String reqLine = readHeaderLine(in);
             if (reqLine == null) return;
 
@@ -150,8 +153,9 @@ public final class SystemGatewayServer {
                 return;
             }
 
-            if ("POST".equals(method) && (path.startsWith("/v1/chat/completions") || path.startsWith("/chat/completions"))) {
-                sock.setSoTimeout(120000);
+            if ("POST".equals(method) && (path.startsWith("/v1/chat/completions") || path.startsWith("/chat/completions")
+                    || path.startsWith("/v1/messages") || path.startsWith("/messages"))) {
+                sock.setSoTimeout(180000);
                 String bodyStr = "";
                 if (contentLength > 0) {
                     byte[] payloadBytes = new byte[contentLength];
@@ -166,7 +170,11 @@ public final class SystemGatewayServer {
                     }
                     bodyStr = new String(payloadBytes, StandardCharsets.UTF_8);
                 }
-                com.agy.ai.AiModelManager.proxyChatCompletions(context, bodyStr, out);
+                if (path.startsWith("/v1/messages") || path.startsWith("/messages")) {
+                    com.agy.ai.AiModelManager.proxyNativeAnthropicMessages(context, bodyStr, out);
+                } else {
+                    com.agy.ai.AiModelManager.proxyChatCompletions(context, bodyStr, out);
+                }
                 return;
             }
 

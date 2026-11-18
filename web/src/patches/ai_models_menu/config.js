@@ -16,6 +16,7 @@ var PROVIDER_ORDER = [
   'openrouter',
   'openai',
   'anthropic',
+  'custom_anthropic',
   'deepseek',
   'groq',
   'xai',
@@ -49,9 +50,16 @@ var PROVIDER_META = {
   anthropic: {
     id: 'anthropic',
     shortName: 'Anthropic Claude',
-    badge: 'Claude 4 / 3.7',
+    badge: 'Claude 4.5 / 4',
     placeholderKey: 'sk-ant-api03-...',
-    helpText: 'Get your API key from console.anthropic.com/settings/keys'
+    helpText: 'Official Anthropic Claude API or custom Anthropic base URL using native /v1/messages protocol'
+  },
+  custom_anthropic: {
+    id: 'custom_anthropic',
+    shortName: 'Custom Anthropic',
+    badge: 'Anthropic /v1/messages',
+    placeholderKey: 'sk-ant-... or proxy token (optional)',
+    helpText: 'Connect any Anthropic Messages API (/v1/messages) compatible endpoint, proxy, or relay (Claude Proxy, LiteLLM, Bedrock Gateway, Zhipu GLM, MiniMax, etc.)'
   },
   deepseek: {
     id: 'deepseek',
@@ -91,11 +99,54 @@ var PROVIDER_META = {
   custom: {
     id: 'custom',
     shortName: 'Custom / Local',
-    badge: 'OpenAI / GenAI',
+    badge: 'OpenAI / Anthropic / GenAI',
     placeholderKey: 'sk-... (optional for local Ollama)',
-    helpText: 'Connect any OpenAI- or Gemini-compatible server (Ollama, vLLM, LiteLLM, Together, Fireworks, etc.).'
+    helpText: 'Connect any OpenAI-, Anthropic-, or Gemini-compatible server (Ollama, vLLM, LiteLLM, Together, Fireworks, etc.).'
   }
 };
+
+var ENDPOINT_PRESETS = {
+  anthropic: [
+    { label: 'Official Anthropic', baseUrl: 'https://api.anthropic.com/v1', wireProtocol: 'anthropic' },
+    { label: 'Anthropic (OpenAI Compat)', baseUrl: 'https://api.anthropic.com/v1', wireProtocol: 'openai' }
+  ],
+  custom_anthropic: [
+    { label: 'Anthropic Official', baseUrl: 'https://api.anthropic.com/v1', wireProtocol: 'anthropic' },
+    { label: 'LiteLLM / Local Proxy', baseUrl: 'http://127.0.0.1:4000/v1', wireProtocol: 'anthropic' },
+    { label: 'Zhipu GLM (Anthropic)', baseUrl: 'https://open.bigmodel.cn/api/anthropic/v1', wireProtocol: 'anthropic' },
+    { label: 'MiniMax (Anthropic)', baseUrl: 'https://api.minimax.io/anthropic/v1', wireProtocol: 'anthropic' }
+  ],
+  custom: [
+    { label: 'Ollama Local', baseUrl: 'http://127.0.0.1:11434/v1', wireProtocol: 'openai' },
+    { label: 'LiteLLM Proxy', baseUrl: 'http://127.0.0.1:4000/v1', wireProtocol: 'openai' },
+    { label: 'Custom Anthropic (/v1/messages)', baseUrl: 'https://api.anthropic.com/v1', wireProtocol: 'anthropic' },
+    { label: 'Custom Gemini (/v1beta)', baseUrl: 'https://generativelanguage.googleapis.com', wireProtocol: 'genai' }
+  ]
+};
+
+function resolveEndpointPreviewUrl(providerId, rawBaseUrl, wireProtocol) {
+  var url = String(rawBaseUrl || '').trim().replace(/\/+$/, '');
+  if (!url) return '(enter a Base URL above)';
+  var proto = String(wireProtocol || 'openai').toLowerCase();
+  if (proto === 'anthropic') {
+    if (url.endsWith('/messages')) return 'POST ' + url;
+    if (url.endsWith('/chat/completions')) url = url.slice(0, -'/chat/completions'.length);
+    if (url.endsWith('/v1') || url.endsWith('/v1beta') || url.endsWith('/anthropic')) {
+      return 'POST ' + url + '/messages';
+    }
+    return 'POST ' + url + '/v1/messages';
+  }
+  if (proto === 'genai') {
+    var base = url.endsWith('/v1beta') ? url : url + '/v1beta';
+    return 'POST ' + base + '/models/{model}:streamGenerateContent';
+  }
+  if (url.endsWith('/chat/completions')) return 'POST ' + url;
+  if (url.endsWith('/messages')) url = url.slice(0, -'/messages'.length);
+  if (url.endsWith('/v1') || url.endsWith('/openai') || url.endsWith('/v1beta')) {
+    return 'POST ' + url + '/chat/completions';
+  }
+  return 'POST ' + url + '/v1/chat/completions';
+}
 
 function getDefaultConfig() {
   return {
@@ -108,6 +159,7 @@ function getDefaultConfig() {
         apiKey: '',
         baseUrl: 'https://generativelanguage.googleapis.com',
         wireProtocol: 'genai',
+        customHeaders: {},
         models: [
           { modelId: 'gemini-2.5-pro', displayName: 'Gemini 2.5 Pro', supportsThinking: true, enabled: true, maxTokens: 1048576, maxOutputTokens: 65536 },
           { modelId: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', supportsThinking: true, enabled: true, maxTokens: 1048576, maxOutputTokens: 65536 },
@@ -121,6 +173,7 @@ function getDefaultConfig() {
         apiKey: '',
         baseUrl: 'https://openrouter.ai/api/v1',
         wireProtocol: 'openai',
+        customHeaders: {},
         models: [
           { modelId: 'anthropic/claude-sonnet-4', displayName: 'Claude 4 Sonnet (OpenRouter)', supportsThinking: true, enabled: true, maxTokens: 200000, maxOutputTokens: 64000 },
           { modelId: 'anthropic/claude-3.7-sonnet', displayName: 'Claude 3.7 Sonnet (OpenRouter)', supportsThinking: true, enabled: true, maxTokens: 200000, maxOutputTokens: 64000 },
@@ -138,6 +191,7 @@ function getDefaultConfig() {
         apiKey: '',
         baseUrl: 'https://api.openai.com/v1',
         wireProtocol: 'openai',
+        customHeaders: {},
         models: [
           { modelId: 'gpt-4.1', displayName: 'GPT-4.1', supportsThinking: false, enabled: true, maxTokens: 1047576, maxOutputTokens: 32768 },
           { modelId: 'gpt-4.1-mini', displayName: 'GPT-4.1 Mini', supportsThinking: false, enabled: true, maxTokens: 1047576, maxOutputTokens: 32768 },
@@ -148,15 +202,31 @@ function getDefaultConfig() {
       },
       anthropic: {
         name: 'Anthropic Claude',
-        description: 'Claude 4 Opus/Sonnet & Claude 3.7 Sonnet via Anthropic API Key',
+        description: 'Claude 4.5 / 4 Sonnet, Opus 4 & Claude 3.7 via Anthropic Messages API (/v1/messages)',
         apiKey: '',
         baseUrl: 'https://api.anthropic.com/v1',
-        wireProtocol: 'openai',
+        wireProtocol: 'anthropic',
+        customHeaders: {},
         models: [
+          { modelId: 'claude-sonnet-4-5-20250929', displayName: 'Claude 4.5 Sonnet', supportsThinking: true, enabled: true, maxTokens: 200000, maxOutputTokens: 64000 },
           { modelId: 'claude-sonnet-4-20250514', displayName: 'Claude 4 Sonnet', supportsThinking: true, enabled: true, maxTokens: 200000, maxOutputTokens: 64000 },
           { modelId: 'claude-opus-4-20250514', displayName: 'Claude 4 Opus', supportsThinking: true, enabled: true, maxTokens: 200000, maxOutputTokens: 32000 },
           { modelId: 'claude-3-7-sonnet-latest', displayName: 'Claude 3.7 Sonnet', supportsThinking: true, enabled: true, maxTokens: 200000, maxOutputTokens: 64000 },
           { modelId: 'claude-3-5-haiku-latest', displayName: 'Claude 3.5 Haiku', supportsThinking: false, enabled: true, maxTokens: 200000, maxOutputTokens: 8192 }
+        ]
+      },
+      custom_anthropic: {
+        name: 'Custom Anthropic Endpoint',
+        description: 'Any Anthropic Messages API (/v1/messages) compatible endpoint, proxy, or relay',
+        apiKey: '',
+        baseUrl: 'https://api.anthropic.com/v1',
+        wireProtocol: 'anthropic',
+        customHeaders: {},
+        models: [
+          { modelId: 'claude-sonnet-4-5-20250929', displayName: 'Claude 4.5 Sonnet (Custom)', supportsThinking: true, enabled: true, maxTokens: 200000, maxOutputTokens: 64000 },
+          { modelId: 'claude-sonnet-4-20250514', displayName: 'Claude 4 Sonnet (Custom)', supportsThinking: true, enabled: true, maxTokens: 200000, maxOutputTokens: 64000 },
+          { modelId: 'claude-opus-4-20250514', displayName: 'Claude 4 Opus (Custom)', supportsThinking: true, enabled: true, maxTokens: 200000, maxOutputTokens: 32000 },
+          { modelId: 'claude-3-7-sonnet-latest', displayName: 'Claude 3.7 Sonnet (Custom)', supportsThinking: true, enabled: true, maxTokens: 200000, maxOutputTokens: 64000 }
         ]
       },
       deepseek: {
@@ -165,6 +235,7 @@ function getDefaultConfig() {
         apiKey: '',
         baseUrl: 'https://api.deepseek.com/v1',
         wireProtocol: 'openai',
+        customHeaders: {},
         models: [
           { modelId: 'deepseek-chat', displayName: 'DeepSeek V3 (Chat)', supportsThinking: false, enabled: true, maxTokens: 64000, maxOutputTokens: 8192 },
           { modelId: 'deepseek-reasoner', displayName: 'DeepSeek R1 (Reasoner)', supportsThinking: true, enabled: true, maxTokens: 64000, maxOutputTokens: 8192 }
@@ -176,6 +247,7 @@ function getDefaultConfig() {
         apiKey: '',
         baseUrl: 'https://api.groq.com/openai/v1',
         wireProtocol: 'openai',
+        customHeaders: {},
         models: [
           { modelId: 'llama-3.3-70b-versatile', displayName: 'Llama 3.3 70B Versatile', supportsThinking: false, enabled: true, maxTokens: 128000, maxOutputTokens: 32768 },
           { modelId: 'deepseek-r1-distill-llama-70b', displayName: 'DeepSeek R1 Distill Llama 70B', supportsThinking: true, enabled: true, maxTokens: 128000, maxOutputTokens: 16384 },
@@ -189,6 +261,7 @@ function getDefaultConfig() {
         apiKey: '',
         baseUrl: 'https://api.x.ai/v1',
         wireProtocol: 'openai',
+        customHeaders: {},
         models: [
           { modelId: 'grok-3-beta', displayName: 'Grok 3', supportsThinking: false, enabled: true, maxTokens: 131072, maxOutputTokens: 16384 },
           { modelId: 'grok-3-mini-beta', displayName: 'Grok 3 Mini (Reasoning)', supportsThinking: true, enabled: true, maxTokens: 131072, maxOutputTokens: 16384 }
@@ -200,6 +273,7 @@ function getDefaultConfig() {
         apiKey: '',
         baseUrl: 'https://api.mistral.ai/v1',
         wireProtocol: 'openai',
+        customHeaders: {},
         models: [
           { modelId: 'codestral-latest', displayName: 'Codestral (Coding)', supportsThinking: false, enabled: true, maxTokens: 256000, maxOutputTokens: 16384 },
           { modelId: 'mistral-large-latest', displayName: 'Mistral Large', supportsThinking: false, enabled: true, maxTokens: 128000, maxOutputTokens: 16384 }
@@ -207,10 +281,11 @@ function getDefaultConfig() {
       },
       custom: {
         name: 'Custom Endpoint / Local LLM',
-        description: 'OpenAI- or Gemini-compatible custom endpoint (Ollama, vLLM, LiteLLM, Together, etc.)',
+        description: 'OpenAI-, Anthropic-, or Gemini-compatible custom endpoint (Ollama, vLLM, LiteLLM, Together, etc.)',
         apiKey: '',
         baseUrl: 'http://127.0.0.1:11434/v1',
         wireProtocol: 'openai',
+        customHeaders: {},
         models: [
           { modelId: 'qwen2.5-coder:7b', displayName: 'Qwen 2.5 Coder 7B (Local)', supportsThinking: false, enabled: true, maxTokens: 128000, maxOutputTokens: 8192 }
         ]
@@ -241,7 +316,16 @@ function mergeConfigs(defaults, loaded) {
       var dst = out.providers[pid];
       if (typeof src.apiKey === 'string') dst.apiKey = src.apiKey;
       if (typeof src.baseUrl === 'string' && src.baseUrl.trim()) dst.baseUrl = src.baseUrl.trim();
-      if (typeof src.wireProtocol === 'string' && src.wireProtocol.trim()) dst.wireProtocol = src.wireProtocol.trim();
+      if (typeof src.wireProtocol === 'string' && src.wireProtocol.trim()) {
+        var proto = src.wireProtocol.trim();
+        if (pid === 'anthropic' && proto === 'openai' && dst.baseUrl.indexOf('api.anthropic.com') !== -1) {
+          proto = 'anthropic';
+        }
+        dst.wireProtocol = proto;
+      }
+      if (src.customHeaders && typeof src.customHeaders === 'object' && !Array.isArray(src.customHeaders)) {
+        dst.customHeaders = src.customHeaders;
+      }
       if (Array.isArray(src.models) && src.models.length > 0) {
         dst.models = src.models;
       }
