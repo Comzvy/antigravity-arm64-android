@@ -140,8 +140,8 @@ flowchart TD
 # Стандартная сборка релизного APK (dist/antigravity.apk, порт 45157):
 bash modules/builder/build_apk.sh
 
-# Сборка релизной версии с обходом проверок (dist/antigravity-region-bypass.apk, порт 45157):
-bash modules/builder/build_apk.sh --region-bypass
+# Сборка dev-версии APK (dist/antigravity-dev.apk, порт 45158):
+bash modules/builder/build_apk.sh --dev
 
 # Запуск тестов модуля builder:
 bash modules/builder/tests/run_all.sh
