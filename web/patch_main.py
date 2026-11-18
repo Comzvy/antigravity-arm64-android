@@ -383,6 +383,84 @@ def patch_remote_projects_startup(content):
     return content, modified
 
 
+def patch_agent_stream_resync(content):
+    """Add resume/visibility/stall recovery to consumeAgentStateStream (kda)."""
+    if "__agStreamResyncPatch" in content:
+        print("[web-patch] Agent stream resync patch already present in main.js")
+        return content, False
+
+    anchor = content.find('"[consumeAgentStateStream] streamAgentStateUpdates error:"')
+    if anchor == -1:
+        print("[web-patch] WARNING: consumeAgentStateStream anchor not found in main.js", file=sys.stderr)
+        return content, False
+
+    win_start = max(0, anchor - 2500)
+    win_end = min(len(content), anchor + 500)
+    window = content[win_start:win_end]
+
+    kda_re = re.compile(
+        r'(async function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\)\{'
+        r'var ([A-Za-z0-9_$]+)=e,([A-Za-z0-9_$]+)=e;try\{let \{initialStepsSlice:[^}]+\}=[^,]+,([A-Za-z0-9_$]+)=Af\(\3\),[A-Za-z0-9_$]+=[A-Za-z0-9_$]+,[A-Za-z0-9_$]+=0;'
+        r'for\(;!\5\.signal\.aborted;\)\{if\([A-Za-z0-9_$]+\)\{[^}]+\}let [A-Za-z0-9_$]+=Jf\(\);[A-Za-z0-9_$]+\?\.\([A-Za-z0-9_$]+\);)'
+        r'(try\{let ([A-Za-z0-9_$]+)=cc\([^.]+\.StreamAgentStateUpdatesRequestSchema,\{[^}]+\}\)),([A-Za-z0-9_$]+)=\2\(\11,\{signal:\5\.signal\}\);(for await\(let [A-Za-z0-9_$]+ of \7\(\12\)\)\{\8\(\);try\{)'
+        r'(.*?\[consumeAgentStateStream\] streamAgentStateUpdates error:.*?if\(!([A-Za-z0-9_$]+)\)break\})'
+        r'\5\.signal\.aborted\|\|\8\(await \7\(new Promise\(([A-Za-z0-9_$]+)=>setTimeout\(\16,1E3\)\)\)\);',
+        re.DOTALL,
+    )
+    m = kda_re.search(window)
+    if not m:
+        print("[web-patch] WARNING: consumeAgentStateStream pattern did not match in main.js", file=sys.stderr)
+        return content, False
+
+    (
+        hdr, a_arg, _b_arg, _c_arg, d_arg, _f_arg,
+        g_var, h_var, z_var,
+        req_try, e_var, g_stream_var, for_hdr,
+        body_to_break, g_flag, timer_arg,
+    ) = m.groups()
+    catch_re = re.compile(
+        rf'(.*?\}})(catch\(([A-Za-z0-9_$]+)\)\{{{re.escape(h_var)}\(\);if\({re.escape(d_arg)}\.signal\.aborted\)break;let {re.escape(g_flag)}=!0;)(.*)(if\(!{re.escape(g_flag)}\)break\}})$',
+        re.DOTALL,
+    )
+    mc = catch_re.match(body_to_break)
+    if not mc:
+        print("[web-patch] WARNING: consumeAgentStateStream catch block did not match in main.js", file=sys.stderr)
+        return content, False
+
+    try_tail, catch_hdr, _err_var, catch_body, catch_tail = mc.groups()
+
+    setup = (
+        f'/*__agStreamResyncPatch*/'
+        f'var _ac=new AbortController(),_rs=!1,_lm=Date.now(),'
+        f'_wh=typeof document!=="undefined"&&document.hidden,'
+        f'_oa=()=>{{_ac.abort({d_arg}.signal.reason)}},'
+        f'_tr=()=>{{if(!_rs&&!{d_arg}.signal.aborted){{_rs=!0;_ac.abort("agy_stream_resync")}}}},'
+        f'_ov=()=>{{if(typeof document!=="undefined"){{if(document.visibilityState==="hidden")_wh=!0;else if(_wh){{_wh=!1;_tr()}}}}}},'
+        f'_oh=()=>{{if(_wh||Date.now()-_lm>3E3)_wh=!1,_tr()}};'
+        f'{d_arg}.signal.addEventListener("abort",_oa,{{once:!0}});'
+        f'if(typeof document!=="undefined")document.addEventListener("visibilitychange",_ov);'
+        f'if(typeof window!=="undefined"){{window.addEventListener("agy:host-resume",_oh);window.addEventListener("online",_tr)}}'
+        f'var _wd=setInterval(()=>{{if(!_rs&&!{d_arg}.signal.aborted&&({z_var}.status===2||{z_var}.executableStatus===2||{z_var}.executorLoopStatus===2||{z_var}.fullyIdle===!1)&&Date.now()-_lm>2E4)_tr()}},5E3);'
+        f'try{{'
+    )
+    cleanup = (
+        f'}}finally{{clearInterval(_wd);{d_arg}.signal.removeEventListener("abort",_oa);'
+        f'if(typeof document!=="undefined")document.removeEventListener("visibilitychange",_ov);'
+        f'if(typeof window!=="undefined"){{window.removeEventListener("agy:host-resume",_oh);window.removeEventListener("online",_tr)}}}}'
+        f'{d_arg}.signal.aborted||{h_var}(await {g_var}(new Promise({timer_arg}=>setTimeout({timer_arg},_rs?50:1E3))));'
+    )
+    repl = (
+        f'{hdr}{setup}'
+        f'{req_try},{g_stream_var}={a_arg}({e_var},{{signal:_ac.signal}});{for_hdr}_lm=Date.now();'
+        f'{try_tail}{catch_hdr}if(!_rs){{{catch_body}}}{catch_tail}'
+        f'{cleanup}'
+    )
+    new_window = window[:m.start()] + repl + window[m.end():]
+    content = content[:win_start] + new_window + content[win_end:]
+    print("[web-patch] Successfully patched consumeAgentStateStream (__agStreamResyncPatch) into main.js")
+    return content, True
+
+
 def patch_main(file_path):
     if not os.path.isfile(file_path):
         print(f"[web-patch] file not found: {file_path}", file=sys.stderr)
@@ -397,8 +475,9 @@ def patch_main(file_path):
     content, mod4 = patch_mcp_plugins_fallback(content)
     content, mod5 = patch_voice_mode_worklet(content)
     content, mod6 = patch_remote_projects_startup(content)
+    content, mod7 = patch_agent_stream_resync(content)
 
-    if mod1 or mod2 or mod3 or mod4 or mod5 or mod6:
+    if mod1 or mod2 or mod3 or mod4 or mod5 or mod6 or mod7:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
 
@@ -408,6 +487,7 @@ def patch_main(file_path):
         and "__agMcpPluginsFallback" in content
         and "__agVoiceMicWorkletPatch" in content
         and "__agRemoteStartupPatch" in content
+        and "__agStreamResyncPatch" in content
     )
 
 

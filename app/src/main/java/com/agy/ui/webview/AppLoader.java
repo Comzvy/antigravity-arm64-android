@@ -44,8 +44,8 @@ public final class AppLoader {
             hostTheme = "system";
         }
         String origin = "https://127.0.0.1:" + port + "/";
-        String historyUrl = origin + "?hostTheme=" + hostTheme;
-        webView.loadDataWithBaseURL(origin, AppHtmlInjector.inject(html, bridge, theme),
-                "text/html", "UTF-8", historyUrl);
+        String appUrl = origin + "?hostTheme=" + hostTheme + "&wsTransport=3";
+        webView.loadDataWithBaseURL(appUrl, AppHtmlInjector.inject(html, bridge, theme),
+                "text/html", "UTF-8", appUrl);
     }
 }
