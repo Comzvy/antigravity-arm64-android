@@ -1,6 +1,6 @@
 # Antigravity for Android
 
-Antigravity v2.33.0 (Linux ARM64) berjalan **native di Android (Bionic)**, tanpa PRoot/chroot. Dilengkapi gateway AI multi-provider, mode suara, dan terminal web bawaan.
+Antigravity v2.33.0 (Linux ARM64) running **natively on Android (Bionic)**, with no PRoot or chroot. Includes a multi-provider AI gateway, voice mode, and a built-in web terminal.
 
 [![Release](https://img.shields.io/github/v/release/Comzvy/antigravity-arm64-android?style=flat-square&color=38bdf8)](https://github.com/Comzvy/antigravity-arm64-android/releases/latest)
 ![Android](https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=flat-square)
@@ -11,26 +11,26 @@ Antigravity v2.33.0 (Linux ARM64) berjalan **native di Android (Bionic)**, tanpa
 
 <img alt="Antigravity for Android" src="docs/assets/hero_dark.png" width="100%" />
 
-## Fitur
+## Features
 
-- **Native core**: `language_server` jalan langsung di Bionic dengan `liblse_compat.so` (emulasi LSE).
-- **Multi-provider AI (BYOK)**: Gemini, OpenAI, Claude, OpenRouter, Groq, DeepSeek, atau endpoint kompatibel OpenAI.
-- **Mode suara**: speech recognition, transkripsi cloud, dan text-to-speech.
-- **Terminal web**: PTY bash, package manager `pkg`, dan scheduler `agy-daemon`.
-- **UX mobile**: sinkron tema, wake lock, file picker, bottom sheet.
-- **Shizuku**: shell ADB elevated (`rish`) dan notifikasi (`agy-notify`).
+- **Native core**: `language_server` runs directly on Bionic with `liblse_compat.so` (LSE emulation).
+- **Multi-provider AI (BYOK)**: Gemini, OpenAI, Claude, OpenRouter, Groq, DeepSeek, or any OpenAI-compatible endpoint.
+- **Voice mode**: speech recognition, cloud transcription, and text-to-speech.
+- **Web terminal**: PTY bash, the `pkg` package manager, and the `agy-daemon` scheduler.
+- **Mobile UX**: theme sync, wake lock, file picker, bottom sheets.
+- **Shizuku**: elevated ADB shell (`rish`) and notifications (`agy-notify`).
 
-## Mulai Cepat
+## Quick Start
 
-1. Unduh `antigravity.apk` dari [rilis terbaru](https://github.com/Comzvy/antigravity-arm64-android/releases/latest).
-2. Beri izin **All Files Access**, dan **Microphone** bila memakai mode suara (opsional: Shizuku).
-3. Di terminal bawaan:
+1. Download `antigravity.apk` from the [latest release](https://github.com/Comzvy/antigravity-arm64-android/releases/latest).
+2. Grant **All Files Access**, and **Microphone** if you use voice mode (optional: Shizuku).
+3. In the built-in terminal:
    ```bash
    pkg update && pkg install git python nodejs bash
    ```
-4. Tambah API key di **Settings ➔ AI Models & API Keys**.
+4. Add your API keys under **Settings ➔ AI Models & API Keys**.
 
-## Build dari Source
+## Build from Source
 
 ```bash
 bash build.sh          # dist/antigravity.apk
@@ -38,17 +38,17 @@ bash build.sh --dev    # dist/antigravity-dev.apk
 bash test_all_modules.sh
 ```
 
-## Struktur
+## Structure
 
-| Folder | Isi |
+| Folder | Contents |
 | :--- | :--- |
-| [`app/`](app/) | Host Android (Activity, WebView, AI router, layanan) |
-| [`web/`](web/) | UI workbench dan patch JS |
-| [`modules/`](modules/) | Builder APK, runtime, patcher ELF, runner |
-| [`env/`](env/) | Skrip userspace, `pkg`, `agy-daemon` |
-| [`config/`](config/) | Versi dan konstanta runtime |
-| [`docs/`](docs/) | Aset gambar |
+| [`app/`](app/) | Android host (Activities, WebView, AI router, services) |
+| [`web/`](web/) | Workbench UI and JS patches |
+| [`modules/`](modules/) | APK builder, runtime, ELF patchers, runner |
+| [`env/`](env/) | Userspace scripts, `pkg`, `agy-daemon` |
+| [`config/`](config/) | Version and runtime constants |
+| [`docs/`](docs/) | Image assets |
 
 ---
 
-<sub>Dikelola oleh [Comzvy](https://github.com/Comzvy) · Lisensi [Apache-2.0](LICENSE)</sub>
+<sub>Maintained by [Comzvy](https://github.com/Comzvy) · Licensed under [Apache-2.0](LICENSE)</sub>
