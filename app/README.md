@@ -99,14 +99,16 @@ graph TD
 - **Двухфазная схема запуска и работа экрана/фона (Splash, Keep-Screen-On & Background Flow)**:
   1. `MainActivity` стартует с нативным Canvas-экраном (`NativeSplashDotsView`), не инициализируя тяжелый Chromium WebView для анимации трех точек (экономия ~40 МБ RAM), и устанавливает флаг окна `FLAG_KEEP_SCREEN_ON`, удерживая экран включенным, пока приложение открыто на переднем плане.
   2. Параллельно `CoreServerService` распаковывает ядро и ожидает готовности локального HTTPS порта (зонд `CoreReadyProbe`).
-  3. После ответа порта `WebViewHost.loadApp()` инжектирует HTML и конфигурацию. Для `WebView` задается политика `RENDERER_PRIORITY_IMPORTANT` (`waivedWhenNotVisible = false`), а `WebViewLifecycle.pause()` не вызывает `pauseTimers()`, благодаря чему JS-таймеры и стриминг агента продолжают работать в фоне и на экране блокировки.
+  3. После ответа порта `WebViewHost.loadApp()` инжектирует HTML и конфигурацию. Для `WebView` задается политика `RENDERER_PRIORITY_IMPORTANT` (`waivedWhenNotVisible = false`), а `WebViewLifecycle.pause()` не вызывает `webView.onPause()` и `pauseTimers()`, благодаря чему ожидающие диалоги разрешений (`getUserMedia`), аудиосессии Voice Mode, JS-таймеры и стриминг агента продолжают работать без обрывов.
   4. Скрытие сплэша происходит только по сигналу первого рендера из JavaScript (`window.Android.onUiReady()`), исключая мерцание белого экрана.
 - **`LocalAssetServer`**:
   - Перехватывает вызовы `shouldInterceptRequest` в `AgyWebViewClient` для Same-Origin адреса `https://127.0.0.1:<port>/*`.
   - Статические файлы (`files/web/*`) отдаются напрямую из локального кэша приложения в памяти, не нагружая Go-сервер ядра. RPC и веб-сокеты (`/exa.*`, `/jetski.*`, streaming) прозрачно пропускаются к ядру.
 - **`AppHtmlInjector`**:
-  - Внедряет в `<head>` веб-бандла строгую директиву Content-Security-Policy (CSP).
+  - Внедряет в `<head>` веб-бандла политику Content-Security-Policy (CSP) с поддержкой `'self' blob: data:` в `script-src`/`worker-src`, `media-src` и `wss: ws:` в `connect-src` для работы AudioWorklet и Voice Mode WebSocket.
   - Инициализирует глобальные объекты `window.__APP_CONFIG__`, `window.__AG_ENDPOINTS__`, `window.__AG_CSRF__` и одноразовый криптографический токен `blobBridgeToken`.
+- **`OnboardingSeeder`**:
+  - Инициализирует начальное состояние (`jetski_state.pbtxt`, `antigravity_state.pbtxt`, `AGENTS.md`, `config.json`) и гарантирует наличие поля `"id": "outside-of-project"` в `~/.gemini/config/projects/outside-of-project.json`, исключая ошибку `read_projects_empty_id` при чтении списка проектов.
 - **Файловый пикер и загрузки (`FileDownloader`)**:
   - Обрабатывает загрузки обычных файлов и Base64 Blobs (`saveBlob`).
   - Поддерживает выбор файлов и папок через Storage Access Framework (SAF) и сохранение персистентных разрешений (`takePersistableUriPermission`).

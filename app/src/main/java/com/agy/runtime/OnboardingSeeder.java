@@ -47,12 +47,34 @@ public final class OnboardingSeeder {
                 return;
             }
             File outside = new File(projects, "outside-of-project.json");
-            if (!outside.isFile()) {
-                AtomicFileWriter.writeText(outside, "{}\n");
-            }
+            seedOutsideProject(outside);
         } catch (Exception e) {
             Log.w(TAG, "onboarding seed failed (continuing): " + e.getMessage());
         }
+    }
+
+    /**
+     * Ensures {@code outside-of-project.json} carries a non-empty {@code "id"}
+     * field so {@code ReadProjects} does not log {@code read_projects_empty_id}
+     * and the UI's project list reconciliation does not re-fetch on every update.
+     */
+    private static void seedOutsideProject(File outside) throws Exception {
+        JSONObject obj = new JSONObject();
+        if (outside.isFile() && outside.length() > 0) {
+            try (InputStream in = new FileInputStream(outside)) {
+                String raw = com.agy.util.IoUtil.readAll(in, "UTF-8");
+                if (raw != null && !raw.trim().isEmpty()) {
+                    obj = new JSONObject(raw);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "could not parse existing outside-of-project.json, recreating: " + e.getMessage());
+            }
+        }
+        if ("outside-of-project".equals(obj.optString("id", ""))) {
+            return;
+        }
+        obj.put("id", "outside-of-project");
+        AtomicFileWriter.writeText(outside, obj.toString(2) + "\n");
     }
 
     /**

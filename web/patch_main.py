@@ -97,14 +97,18 @@ def patch_voice_input(content):
 
     modified = False
 
-    # 1. Force enable-audio-transcription experiment flag to true
+    # 1. Force default-enabled experiment flags when Mendel flags have not loaded yet
     exp_re = re.compile(
         r'c\|\|\(c=([A-Za-z0-9_$]+)\(a\.stateProvider,([A-Za-z0-9_$]+)=>\(\2=\2\[b\]\)\?!\2\.disabled:!1\),a\.experimentEnabledProviders\.set\(b,c\)\)'
     )
     m_exp = exp_re.search(content)
     if m_exp:
         fn_id, arg_id = m_exp.group(1), m_exp.group(2)
-        repl = f'c||(c={fn_id}(a.stateProvider,{arg_id}=>b==="enable-audio-transcription"?!0:({arg_id}={arg_id}[b])?!{arg_id}.disabled:!1),a.experimentEnabledProviders.set(b,c))'
+        repl = (
+            f'c||(c={fn_id}(a.stateProvider,{arg_id}=>({arg_id}={arg_id}[b])?!{arg_id}.disabled:'
+            '(b==="enable-audio-transcription"||b==="enable-remote-ai"||b==="enable-github-decorator"||b==="enable-voice-relay")),'
+            'a.experimentEnabledProviders.set(b,c))'
+        )
         content = content[:m_exp.start()] + repl + content[m_exp.end():]
         modified = True
 
@@ -239,6 +243,146 @@ def patch_mcp_plugins_fallback(content):
     return content, True
 
 
+def patch_voice_mode_worklet(content):
+    """Fix Voice Mode AudioWorklet CSP failure and Android getUserMedia mic contention."""
+    if "__agVoiceMicWorkletPatch" in content:
+        print("[web-patch] Voice Mode AudioWorklet & mic fallback already present in main.js")
+        return content, False
+
+    modified = False
+
+    # 1. Load ./audio_processor.js ('self') with Blob/data fallback instead of bare data: URL
+    worklet_re = re.compile(
+        r'([A-Za-z0-9_$]+)\.audioWorklet\.addModule\("data:application/javascript;base64,"\+btoa\(([A-Za-z0-9_$]+)\)\)'
+    )
+    m_w = worklet_re.search(content)
+    if m_w:
+        ctx_var, src_var = m_w.groups()
+        repl = (
+            f'(/*__agVoiceMicWorkletPatch*/async()=>{{'
+            f'try{{return await {ctx_var}.audioWorklet.addModule("./audio_processor.js")}}catch(_a){{'
+            f'try{{var _b=URL.createObjectURL(new Blob([{src_var}],{{type:"application/javascript"}}));'
+            f'try{{return await {ctx_var}.audioWorklet.addModule(_b)}}finally{{URL.revokeObjectURL(_b)}}}}'
+            f'catch(_c){{return {ctx_var}.audioWorklet.addModule("data:application/javascript;base64,"+btoa({src_var}))}}'
+            f'}}}})()'
+        )
+        content = content[:m_w.start()] + repl + content[m_w.end():]
+        modified = True
+
+    # 2. Release any native SpeechRecognizer hold and retry getUserMedia with simpler constraints
+    gum_re = re.compile(
+        r'(async function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\)\{var ([A-Za-z0-9_$]+)=[A-Za-z0-9_$]+,([A-Za-z0-9_$]+)=[A-Za-z0-9_$]+;try\{)'
+        r'(let ([A-Za-z0-9_$]+)=[A-Za-z0-9_$]+\(\3\);)'
+        r'if\(!\8\)return navigator\.mediaDevices\.getUserMedia\(\{audio:\2\}\);'
+    )
+    m_g = gum_re.search(content)
+    if m_g:
+        hdr, a_arg, _b_arg, c_arg, d_var, f_var, let_g, g_var = m_g.groups()
+        repl = (
+            f'{hdr}try{{window.Android?.cancelVoiceRecognition?.(window.__AG_NATIVE_BRIDGE_TOKEN__||"","")}}catch(_){{}}'
+            f'{let_g}if(!{g_var}){{'
+            f'try{{return {f_var}(await {d_var}(navigator.mediaDevices.getUserMedia({{audio:{a_arg}}})))}}catch(_e1){{'
+            f'{f_var}();var _n1=_e1?.name;if({c_arg}?.()||_n1==="NotAllowedError"||_n1==="SecurityError")throw _e1;'
+            f'{f_var}(await {d_var}(new Promise(_r=>{{window.setTimeout(_r,150)}})));if({c_arg}?.())throw _e1;'
+            f'try{{return {f_var}(await {d_var}(navigator.mediaDevices.getUserMedia({{audio:{{echoCancellation:!0,noiseSuppression:!0}}}})))}}catch(_e2){{'
+            f'{f_var}();var _n2=_e2?.name;if({c_arg}?.()||_n2==="NotAllowedError"||_n2==="SecurityError")throw _e2;'
+            f'return navigator.mediaDevices.getUserMedia({{audio:!0}})}}}}}}'
+        )
+        content = content[:m_g.start()] + repl + content[m_g.end():]
+        modified = True
+
+    if modified:
+        print("[web-patch] Successfully patched Voice Mode AudioWorklet & mic fallback into main.js")
+    else:
+        print("[web-patch] WARNING: Voice Mode AudioWorklet/mic patterns did not match in main.js", file=sys.stderr)
+    return content, modified
+
+
+def patch_remote_projects_startup(content):
+    """Ensure remote/GitHub projects load immediately at startup without waiting for delayed Mendel sync."""
+    if "__agRemoteStartupPatch" in content:
+        print("[web-patch] Remote projects startup patch already present in main.js")
+        return content, False
+
+    modified = False
+
+    # 1. Default enable-remote-ai, enable-github-decorator, enable-voice-relay, enable-audio-transcription in Ui()
+    ui_re = re.compile(
+        r'(function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\)\{)return\(\2=\2\.experiments\[\3\]\)\?!\2\.disabled:!1\}'
+    )
+    m_ui = ui_re.search(content)
+    if m_ui:
+        hdr, a_var, b_var = m_ui.groups()
+        repl = (
+            f'{hdr}/*__agRemoteStartupPatch*/var _x={a_var}.experiments[{b_var}];return _x?!_x.disabled:'
+            f'({b_var}==="enable-audio-transcription"||{b_var}==="enable-remote-ai"||{b_var}==="enable-github-decorator"||{b_var}==="enable-voice-relay")}}'
+        )
+        content = content[:m_ui.start()] + repl + content[m_ui.end():]
+        modified = True
+
+    # 2. Include those default-enabled flags in $la() before Mendel finishes warming up
+    all_flags_re = re.compile(
+        r'(function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+)\)\{var ([A-Za-z0-9_$]+)=\2\.experiments;)return Object\.keys\(\3\)\.filter\(([A-Za-z0-9_$]+)=>!\3\[\4\]\?\.disabled\)\}'
+    )
+    m_af = all_flags_re.search(content)
+    if m_af:
+        hdr, _a_var, b_var, c_var = m_af.groups()
+        repl = (
+            f'{hdr}var _k=Object.keys({b_var}).filter({c_var}=>!{b_var}[{c_var}]?.disabled);'
+            f'for(var _f of["enable-audio-transcription","enable-remote-ai","enable-github-decorator","enable-voice-relay"])'
+            f'!{b_var}[_f]&&!_k.includes(_f)&&_k.push(_f);return _k}}'
+        )
+        content = content[:m_af.start()] + repl + content[m_af.end():]
+        modified = True
+
+    # 3. Retry GetMendelFlags quickly when initial call returns {} during server startup refresh
+    mendel_retry_re = re.compile(
+        r'(async function ([A-Za-z0-9_$]+)\(([A-Za-z0-9_$]+)\)\{[^}]{0,260}?if\(([A-Za-z0-9_$]+)!==void 0\)\{var [A-Za-z0-9_$]+=\3\.loaded;\3\.loaded=!0;\3\.flagOverrideSync\.retry\(\);[A-Za-z0-9_$]+&&[A-Za-z0-9_$]+\(\3\.experiments,\4\)\|\|\3\.stateProvider\.setState\(\4\))(\}\})'
+    )
+    m_mr = mendel_retry_re.search(content)
+    if m_mr:
+        hdr, xla_fn, a_var, f_var, tail = m_mr.groups()
+        repl = (
+            f'{hdr};Object.keys({f_var}).length===0&&!{a_var}.__agMendelRetried&&'
+            f'({a_var}.__agMendelRetried=!0,setTimeout(()=>{{{xla_fn}({a_var})}},1500),setTimeout(()=>{{{xla_fn}({a_var})}},3500)){tail}'
+        )
+        content = content[:m_mr.start()] + repl + content[m_mr.end():]
+        modified = True
+
+    # 4. Poll listProjects({backend:2}) on cloud startup in yld() until server finishes auth/state refresh
+    cloud_stream_re = re.compile(
+        r'(function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\)\{)(Li\(\{abort:\3,createStream:[A-Za-z0-9_$]+=>\2\.lsClient\.projectUpdatesStream\(\{backend:2\},\{signal:[A-Za-z0-9_$]+\}\),onMessage:[A-Za-z0-9_$]+=>\{[A-Za-z0-9_$]+\.update\.case==="projectList"\?\(\2\.cloudProjectIds=[A-Za-z0-9_$]+\.update\.value\.projectIds,([A-Za-z0-9_$]+)\(\2\)\):[A-Za-z0-9_$]+\.update\.case==="projectUpdatedId"&&[A-Za-z0-9_$]+\(\2,[A-Za-z0-9_$]+\.update\.value\)\},onError:[A-Za-z0-9_$]+=>\{console\.warn\("\[ProjectUpdates\] Cloud stream error:",[A-Za-z0-9_$]+\)\},onDisconnect:\(\)=>\{console\.warn\("\[ProjectUpdates\] Cloud disconnected"\)\}\}\))(\})'
+    )
+    m_cs = cloud_stream_re.search(content)
+    if m_cs:
+        hdr, a_var, b_var, body, u7_fn, tail = m_cs.groups()
+        repl = (
+            f'{hdr}{body};(async()=>{{for(var _i=0;_i<5&&!{b_var}.signal.aborted;_i++){{'
+            f'try{{var _r=await {a_var}.lsClient.listProjects({{backend:2}},{{signal:{b_var}.signal}});'
+            f'if({b_var}.signal.aborted)break;if(_r?.projectIds?.length>0){{'
+            f'if(JSON.stringify(_r.projectIds)!==JSON.stringify({a_var}.cloudProjectIds)){{{a_var}.cloudProjectIds=_r.projectIds;{u7_fn}({a_var})}}break}}}}catch(_){{}}'
+            f'await new Promise(_w=>setTimeout(_w,1200))}}}})(){tail}'
+        )
+        content = content[:m_cs.start()] + repl + content[m_cs.end():]
+        modified = True
+
+    # 5. Allow retrying GitHub repository fetch after transient startup errors
+    gh_repo_re = re.compile(
+        r'(([A-Za-z0-9_$]+)\("github/repo"\)\.then\([A-Za-z0-9_$]+=>\{([A-Za-z0-9_$]+)\.current=!0;[^}]+\}\)\.catch\(\(\)=>\{)\3\.current=!0;'
+    )
+    m_gh = gh_repo_re.search(content)
+    if m_gh:
+        hdr, _fn_var, ref_var = m_gh.groups()
+        content = content[:m_gh.start()] + f'{hdr}{ref_var}.current=!1;' + content[m_gh.end():]
+        modified = True
+
+    if modified:
+        print("[web-patch] Successfully patched remote projects startup in main.js")
+    else:
+        print("[web-patch] WARNING: remote projects startup patterns did not match in main.js", file=sys.stderr)
+    return content, modified
+
+
 def patch_main(file_path):
     if not os.path.isfile(file_path):
         print(f"[web-patch] file not found: {file_path}", file=sys.stderr)
@@ -251,12 +395,20 @@ def patch_main(file_path):
     content, mod2 = patch_voice_input(content)
     content, mod3 = patch_onboarding_layout(content)
     content, mod4 = patch_mcp_plugins_fallback(content)
+    content, mod5 = patch_voice_mode_worklet(content)
+    content, mod6 = patch_remote_projects_startup(content)
 
-    if mod1 or mod2 or mod3 or mod4:
+    if mod1 or mod2 or mod3 or mod4 or mod5 or mod6:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
 
-    return "Desktop Mode" in content and "__agVoiceBridge" in content and "__agMcpPluginsFallback" in content
+    return (
+        "Desktop Mode" in content
+        and "__agVoiceBridge" in content
+        and "__agMcpPluginsFallback" in content
+        and "__agVoiceMicWorkletPatch" in content
+        and "__agRemoteStartupPatch" in content
+    )
 
 
 if __name__ == "__main__":

@@ -134,9 +134,13 @@ web/
      ```
    - Внедряются React-хуки `useState` и `useCallback`, связывающие состояние с `window.Android.isDesktopMode()` и `localStorage.getItem('ag_desktop_mode')`.
    - Находится вызов `createElement` для секции `{label:"Theme"}` и сразу за ним инжектируются элемент настройки Desktop Mode с переключателем (`Switch`) и пункт **AI Models & API Keys** для открытия менеджера провайдеров и API-ключей (`window.__agOpenAiModelsModal()`).
-3. **Активация голосового ввода (`__agVoiceBridge`)**:
-   - Включает флаг `enable-audio-transcription` и гарантирует `hasMicrophone = true` при наличии нативного моста.
+3. **Активация голосового ввода (`__agVoiceBridge`) и Voice Mode**:
+   - Включает флаги `enable-audio-transcription`, `enable-remote-ai`, `enable-github-decorator` и `enable-voice-relay` по умолчанию до завершения стартового обновления Mendel, а также гарантирует `hasMicrophone = true` при наличии нативного моста.
    - Перенаправляет вызовы `streamAudioTranscription`, `sendAudioChunk` и `endAudioSession` в `window.__agVoiceBridge`, позволяя диктовать текст в реальном времени во всех полях ввода чата и комментариев независимо от выбранной модели ИИ.
+   - Загружает `./audio_processor.js` (`'self'`) с фоллбэком на `Blob`/`data:` URL в `k2a` для обхода ограничений CSP на `data:`-воркеры в WebView, а также сбрасывает нативный `VoiceBridge` и повторяет `getUserMedia` с упрощёнными ограничениями при конфликте аудиоисточника.
+4. **Немедленная загрузка удалённых проектов GitHub на старте**:
+   - Добавляет быстрый повтор `GetMendelFlags`, если первый стартовый запрос вернул пустой набор флагов во время фоновой инициализации ядра.
+   - Выполняет опрос `listProjects({backend: 2})` параллельно с `projectUpdatesStream({backend: 2})` в `Ald` и сбрасывает блокировку повторной загрузки при ошибке `listAvailableResources("github/repo")`.
 
 ---
 
@@ -146,7 +150,7 @@ web/
 
 ### Инъекции во время загрузки (`AppHtmlInjector`)
 Перед передачей разметки в движок WebView, Java-класс `AppHtmlInjector` внедряет в `<head>`:
-- **Strict Content Security Policy (CSP)**: запрет небезопасных внешних фреймов и объектов, ограничение `worker-src 'self' blob:`.
+- **Content Security Policy (CSP)**: запрет небезопасных внешних фреймов и объектов, поддержка `worker-src 'self' blob: data:`, `script-src` c `blob: data:`, `media-src` и `wss: ws:` для работы AudioWorklet и Voice Mode WebSocket.
 - **Глобальные параметры конфигурации**:
   - `window.__APP_CONFIG__` — JSON-параметры среды (версия, платформа, пути к воркспейсу).
   - `window.__AG_ENDPOINTS__` — адрес core-сервера (`core`, `core_http`, `enginePort`).

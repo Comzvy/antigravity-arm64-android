@@ -664,6 +664,10 @@ public class MainActivity extends Activity
                 }
                 try {
                     if (granted) {
+                        WebView wv = (webViewHost != null) ? webViewHost.getWebView() : null;
+                        if (wv != null) {
+                            wv.onResume();
+                        }
                         req.grant(req.getResources());
                     } else {
                         req.deny();

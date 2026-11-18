@@ -28,23 +28,22 @@ public final class WebViewLifecycle {
     }
 
     /**
-     * Host activity left the foreground (home, app switch, screen locked).
-     * Only animations/geolocation are paused (WebView.onPause); JavaScript
-     * timers keep running on purpose so the agent UI (streams, polling,
-     * completion sounds) continues in the background and on a locked screen.
-     * pauseTimers() is NOT used: it freezes every WebView JS timer process-wide.
+     * Host activity left the foreground (dialog, app switch, screen locked).
+     * Intentionally skips both WebView.onPause() and WebView.pauseTimers() so
+     * pending WebView PermissionRequests (getUserMedia), AudioWorklet/WebAudio
+     * Voice Mode sessions, and background agent streams are never aborted when
+     * Android shows a permission prompt or switches overlays.
      */
     public static void pause(WebView webView) {
         if (webView == null) {
             return;
         }
         try {
-            webView.onPause();
             webView.evaluateJavascript(
                     "(function(){ try { window.dispatchEvent(new CustomEvent('agy:host-pause')); } catch(e){} })();",
                     null);
         } catch (Exception e) {
-            Log.w(TAG, "failed to pause webView", e);
+            Log.w(TAG, "failed to notify webView pause", e);
         }
     }
 
