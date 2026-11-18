@@ -1,0 +1,11 @@
+{
+  "archive": {
+    "filename": "language_server.tar.gz",
+    "sha256": "9aa7c2f6f2cfca2a1b52e95fd51918e40ccad77ef0a026f4f574a9e4d762285a"
+  },
+  "binary": {
+    "filename": "language_server",
+    "sha256": "9772a2fd0d7654b317d439afec450a051018d0c69c9fb96e642a801846170fec",
+    "size": 212030128
+  }
+}

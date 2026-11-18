@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 380" role="img" aria-labelledby="title description">
+  <title id="title">Antigravity Android</title>
+  <desc id="description">An AI software engineering workstation running natively on Android and ARM64.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#080d1b"/>
+      <stop offset="0.55" stop-color="#111b33"/>
+      <stop offset="1" stop-color="#101024"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="0.52" stop-color="#818cf8"/>
+      <stop offset="1" stop-color="#c084fc"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#6366f1" stop-opacity=".25"/>
+      <stop offset="1" stop-color="#6366f1" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#94a3b8" stroke-opacity=".07"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="380" rx="24" fill="url(#bg)"/>
+  <rect width="1280" height="380" rx="24" fill="url(#grid)"/>
+  <ellipse cx="1020" cy="185" rx="380" ry="300" fill="url(#glow)"/>
+  <rect x="48" y="0" width="1184" height="3" rx="1.5" fill="url(#accent)"/>
+
+  <g font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif">
+    <rect x="76" y="70" width="272" height="32" rx="16" fill="#17243b" stroke="#334155"/>
+    <circle cx="96" cy="86" r="5" fill="#38bdf8"/>
+    <text x="111" y="91" fill="#cbd5e1" font-size="13" font-weight="650" letter-spacing="1.1">COMZVY  /  ANDROID WORKSTATION</text>
+
+    <text x="72" y="169" fill="#f8fafc" font-size="58" font-weight="780" letter-spacing="-2.3">Antigravity</text>
+    <text x="74" y="225" fill="url(#accent)" font-size="47" font-weight="750" letter-spacing="-1.5">Android</text>
+    <text x="76" y="265" fill="#b6c2d6" font-size="18">Your AI coding workspace. Running natively on Android.</text>
+
+    <g font-size="13" font-weight="650">
+      <rect x="76" y="298" width="116" height="34" rx="17" fill="#17243b" stroke="#334155"/>
+      <text x="94" y="320" fill="#dbeafe">✦  Multi-model AI</text>
+      <rect x="203" y="298" width="104" height="34" rx="17" fill="#17243b" stroke="#334155"/>
+      <text x="221" y="320" fill="#dbeafe">◉  Live voice</text>
+      <rect x="318" y="298" width="100" height="34" rx="17" fill="#17243b" stroke="#334155"/>
+      <text x="337" y="320" fill="#dbeafe">⌘  ARM64</text>
+      <rect x="429" y="298" width="154" height="34" rx="17" fill="#17243b" stroke="#334155"/>
+      <text x="448" y="320" fill="#dbeafe">↗  No container</text>
+    </g>
+  </g>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+    <rect x="744" y="63" width="466" height="254" rx="17" fill="#090f1e" stroke="#334155" stroke-width="1.5"/>
+    <path d="M745 111H1209" stroke="#26334a"/>
+    <circle cx="773" cy="88" r="5" fill="#fb7185"/>
+    <circle cx="793" cy="88" r="5" fill="#fbbf24"/>
+    <circle cx="813" cy="88" r="5" fill="#34d399"/>
+    <text x="850" y="93" fill="#71819c" font-size="12">~/workspace  ·  arm64</text>
+
+    <text x="777" y="148" fill="#7dd3fc" font-size="14">$ agy status</text>
+    <circle cx="783" cy="179" r="4" fill="#34d399"/>
+    <text x="798" y="184" fill="#cbd5e1" font-size="13">Android Bionic runtime</text>
+    <text x="1125" y="184" fill="#34d399" font-size="12">READY</text>
+    <circle cx="783" cy="211" r="4" fill="#34d399"/>
+    <text x="798" y="216" fill="#cbd5e1" font-size="13">AI model gateway</text>
+    <text x="1125" y="216" fill="#34d399" font-size="12">READY</text>
+    <circle cx="783" cy="243" r="4" fill="#34d399"/>
+    <text x="798" y="248" fill="#cbd5e1" font-size="13">Voice + mobile controls</text>
+    <text x="1125" y="248" fill="#34d399" font-size="12">READY</text>
+    <rect x="777" y="270" width="397" height="1" fill="#26334a"/>
+    <text x="777" y="295" fill="#818cf8" font-size="12">Built for touch. Ready to build.</text>
+  </g>
+</svg>
