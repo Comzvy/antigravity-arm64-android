@@ -166,7 +166,7 @@ jobs:
             ### What's New in v2.34.0
 
             - **Upstream v2.34.0 Core & Web Sync:** Updated native ARM64 `language_server` (`go1.28-20261102-RC01`), web workbench assets, binary patchers (`crash_suppressor`, `nosandbox`), and `web/patch_main.py`.
-            - **Skills & Plugins Catalogue:** Browse and one-tap install `10` plugins (`rtk`, `antislop`, `superpowers`, `impeccable`, `context-mode`, `agents-suite`, `planning-with-files`, `sepia`, `gemini-agent-skills`, `antigravity-skills-manager`) and `23` skills under **Settings ➔ Customizations**.
+            - **Skills & Plugins Catalogue:** Browse and one-tap install `10` plugins (`rtk`, `antislop`, `superpowers`, `impeccable`, `context-mode`, `agents-suite`, `planning-with-files`, `sepia`, `gemini-agent-skills`, `antigravity-skills-manager`) and `23` skills under **Settings ➔ Skills & Plugins**, **Settings ➔ Appearance**, or `/customizations`.
             - **Persistent Notification with Stop Control:** Status bar notification stays pinned while active and includes a **Stop** button for clean shutdown of the app, core server, HTTP gateway, wake locks, and `agy-daemon`.
 
             ### Core Capabilities

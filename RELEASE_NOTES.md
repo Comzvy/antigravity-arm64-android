@@ -10,7 +10,7 @@
 - **Persistent Notification with Stop Action:** Added a **Stop** action (`ic_notification_stop` -> `CoreServerService.ACTION_STOP_APP`) to `ForegroundNotification`, pinned with `FLAG_ONGOING_EVENT | FLAG_NO_CLEAR` + `FOREGROUND_SERVICE_IMMEDIATE` and guarded via `ACTION_REPOST_NOTIFICATION` so it cannot be swiped clear while active. Tapping **Stop** cleanly terminates the Activity, foreground notification, core server, HTTP gateway, wake locks, and `agy-daemon`.
 
 ### Skills & Plugins Catalogue
-- **Skills & Plugins Catalogue (`10` Plugins, `23` Skills):** Added the Beta APK catalogue UI (`web/generated/patches/catalogue.js`) backed by `CatalogueManager` (`com.agy.plugins`) and `AndroidBridge` (`listInstalledCatalogue`, `installCatalogueItem`, `uninstallCatalogueItem`, `restartCoreForCatalogue`) supporting built-in skill installation, safe GitHub archive extraction, and RTK binary setup.
+- **Skills & Plugins Catalogue (`10` Plugins, `23` Skills):** Added the Beta APK catalogue UI (`web/generated/patches/catalogue.js`) backed by `CatalogueManager` (`com.agy.plugins`) and `AndroidBridge` (`listInstalledCatalogue`, `installCatalogueItem`, `uninstallCatalogueItem`, `restartCoreForCatalogue`) supporting built-in skill installation, safe GitHub archive extraction, and RTK binary setup. Accessible via **Settings ➔ Skills & Plugins**, **Settings ➔ Appearance**, and the `/customizations` Marketplace view.
 
 ### Release Package
 

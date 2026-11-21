@@ -116,7 +116,7 @@ web/
 | **`patches/touch_model_menu.js`** | IIFE | ~6.7 KB | Адаптация hover-меню выбора моделей Base UI под сенсорный ввод. |
 | **`patches/theme_sync.js`** | IIFE | ~4.7 KB | MutationObserver за классами `<html>`/`<body>` и передача смены темы в нативный Android. |
 | **`patches/ai_models_menu.js`** | IIFE | ~55 KB | Модальное меню и встроенные карточки управления провайдерами ИИ, API-ключами, кастомными эндпоинтами Anthropic (`/v1/messages`) / OpenAI / Gemini, кастомными HTTP-заголовками и каталогом моделей (BYOK). |
-| **`patches/catalogue.js`** | IIFE | — | Встроенный каталог навыков и плагинов (`10` плагинов, `23` навыка из Beta APK) в интерфейсе настроек Customizations / Plugins с поддержкой установки/удаления и перезапуска ядра. |
+| **`patches/catalogue.js`** | IIFE | — | Встроенный каталог навыков и плагинов (`10` плагинов, `23` навыка из Beta APK) с инъекцией в меню Settings (`Skills & Plugins`), `Settings -> Appearance` и `/customizations`, поддержкой установки/удаления и перезапуска ядра. |
 | **`patches/voice_input.js`** | IIFE | ~19 KB | Мост голосового ввода (`window.__agVoiceBridge`), потоковая транскрипция речи Android `SpeechRecognizer` + WebAudio/Whisper/Gemini фоллбэк и полифиллы `SpeechRecognition` / `speechSynthesis`. |
 | **`patches/startup_ready.js`** | IIFE | ~4.7 KB | Детектор первого полезного рендера DOM и перехватчик JS-ошибок для `AndroidBridge`. |
 | **`main.js`** | Raw + Patch | ~12.6 MB | Рабочий бандл React UI (v2.34.0), пропатченный скриптом `patch_main.py` с локализованным поиском паттернов. |
@@ -137,7 +137,7 @@ web/
      hook_pattern = re.compile(r'(var\s+[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==3,\s*[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==2,\s*[A-Za-z0-9_$]+=[A-Za-z0-9_$]+=>\s*[A-Za-z0-9_$]+=>\{.*?\};)')
      ```
    - Внедряются React-хуки `useState` и `useCallback`, связывающие состояние с `window.Android.isDesktopMode()` и `localStorage.getItem('ag_desktop_mode')`.
-   - Находится вызов `createElement` для секции `{label:"Theme"}` и сразу за ним инжектируются элемент настройки Desktop Mode с переключателем (`Switch`) и пункт **AI Models & API Keys** для открытия менеджера провайдеров и API-ключей (`window.__agOpenAiModelsModal()`).
+   - Находится вызов `createElement` для секции `{label:"Theme"}` и сразу за ним инжектируются элемент настройки Desktop Mode с переключателем (`Switch`), пункт **AI Models & API Keys** для открытия менеджера провайдеров и API-ключей (`window.__agOpenAiModelsModal()`) и пункт **Skills & Plugins Catalogue** (`window.__agOpenCatalogueModal("plugins")`).
 3. **Активация голосового ввода (`__agVoiceBridge`) и Voice Mode**:
    - Включает флаги `enable-audio-transcription`, `enable-remote-ai`, `enable-github-decorator` и `enable-voice-relay` по умолчанию до завершения стартового обновления Mendel, а также гарантирует `hasMicrophone = true` при наличии нативного моста.
    - Перенаправляет вызовы `streamAudioTranscription`, `sendAudioChunk` и `endAudioSession` в `window.__agVoiceBridge`, позволяя диктовать текст в реальном времени во всех полях ввода чата и комментариев независимо от выбранной модели ИИ.

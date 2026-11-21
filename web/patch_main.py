@@ -17,7 +17,7 @@ def patch_appearance(content):
         content = content.replace('"Kelola API Key"', '"Manage Keys"')
         print("[web-patch] Updated AI Models button label to English in main.js")
         return content, True
-    if "Desktop Mode" in content or "ag_desktop_mode" in content:
+    if ("Desktop Mode" in content or "ag_desktop_mode" in content) and "__agOpenCatalogueModal" in content:
         print("[web-patch] Desktop Mode & AI Models toggle already present in main.js")
         return content, False
 
@@ -84,6 +84,9 @@ def patch_appearance(content):
         + f',{react_id}.createElement({item_comp},{{label:"AI Models & API Keys",description:"Use Gemini, OpenAI, Claude, OpenRouter, DeepSeek, Groq, or Custom API Keys",'
         + f'rightElement:{react_id}.createElement("button",{{type:"button",onClick:()=>{{if(window.__agOpenAiModelsModal)window.__agOpenAiModelsModal()}},'
         + f'className:"px-3 py-1 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 cursor-pointer"}},"Manage Keys")}})'
+        + f',{react_id}.createElement({item_comp},{{label:"Skills & Plugins Catalogue",description:"Browse and install 10 plugins and 23 agent skills",'
+        + f'rightElement:{react_id}.createElement("button",{{type:"button",onClick:()=>{{if(window.__agOpenCatalogueModal)window.__agOpenCatalogueModal("plugins")}},'
+        + f'className:"px-3 py-1 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 cursor-pointer"}},"Browse")}})'
     )
 
     hook_abs_start = win_start + hook_match.start(1)
@@ -522,6 +525,7 @@ def patch_main(file_path):
 
     return (
         "Desktop Mode" in content
+        and "__agOpenCatalogueModal" in content
         and "__agVoiceBridge" in content
         and "__agMcpPluginsFallback" in content
         and "__agVoiceMicWorkletPatch" in content

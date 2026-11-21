@@ -172,7 +172,7 @@ const filePath = process.argv[2];
 let content = fs.readFileSync(filePath, "utf8");
 
 // 1. patch_appearance
-if (!content.includes("Desktop Mode") && !content.includes("ag_desktop_mode")) {
+if ((!content.includes("Desktop Mode") && !content.includes("ag_desktop_mode")) || !content.includes("__agOpenCatalogueModal")) {
   const tIdx = content.indexOf('{label:"Theme"');
   let hm = null, tm = null, reactId = "D", winStart = 0;
   if (tIdx !== -1) {
@@ -200,7 +200,8 @@ if (!content.includes("Desktop Mode") && !content.includes("ag_desktop_mode")) {
   const origTheme = tm[0];
   const injTheme = origTheme +
     `,${reactId}.createElement(${itemComp},{label:"Desktop Mode",description:"Use desktop viewport and user agent for the workspace",rightElement:${reactId}.createElement(${switchComp},{checked:isDesktop,onCheckedChange:onDesktopToggle})})` +
-    `,${reactId}.createElement(${itemComp},{label:"AI Models & API Keys",description:"Use Gemini, OpenAI, Claude, OpenRouter, DeepSeek, Groq, or Custom API Keys",rightElement:${reactId}.createElement("button",{type:"button",onClick:()=>{if(window.__agOpenAiModelsModal)window.__agOpenAiModelsModal()},className:"px-3 py-1 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 cursor-pointer"},"Manage Keys")})`;
+    `,${reactId}.createElement(${itemComp},{label:"AI Models & API Keys",description:"Use Gemini, OpenAI, Claude, OpenRouter, DeepSeek, Groq, or Custom API Keys",rightElement:${reactId}.createElement("button",{type:"button",onClick:()=>{if(window.__agOpenAiModelsModal)window.__agOpenAiModelsModal()},className:"px-3 py-1 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 cursor-pointer"},"Manage Keys")})` +
+    `,${reactId}.createElement(${itemComp},{label:"Skills & Plugins Catalogue",description:"Browse and install 10 plugins and 23 agent skills",rightElement:${reactId}.createElement("button",{type:"button",onClick:()=>{if(window.__agOpenCatalogueModal)window.__agOpenCatalogueModal("plugins")},className:"px-3 py-1 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 cursor-pointer"},"Browse")})`;
   const hookAbsStart = winStart + hm.index;
   const hookAbsEnd = hookAbsStart + origHook.length;
   content = (content.slice(0, hookAbsStart) + injHook + content.slice(hookAbsEnd)).replace(origTheme, injTheme);
@@ -267,7 +268,7 @@ if (!content.includes("__agMcpPluginsFallback")) {
   );
 }
 
-if (!content.includes("Desktop Mode") || !content.includes("__agVoiceBridge") || !content.includes("__agMcpPluginsFallback")) {
+if (!content.includes("Desktop Mode") || !content.includes("__agOpenCatalogueModal") || !content.includes("__agVoiceBridge") || !content.includes("__agMcpPluginsFallback")) {
   throw new Error("Verification failed: missing expected markers in patched main.js");
 }
 fs.writeFileSync(filePath, content, "utf8");

@@ -33,7 +33,7 @@
 
 - **Native Bionic core** — runs Antigravity v2.34.0 (`language_server`) directly on Android ARM64 with `liblse_compat.so` (ARMv8.0-A+ LSE/SIMD emulation, no PRoot/chroot).
 - **Multi-provider AI (BYOK)** — Gemini, OpenAI, Anthropic Claude, OpenRouter, Groq, DeepSeek, or any OpenAI/Anthropic-compatible endpoint.
-- **Skills & Plugins Catalogue** — built-in catalogue (`10` plugins, `23` skills) with one-tap install and uninstall under **Settings ➔ Customizations**.
+- **Skills & Plugins Catalogue** — built-in catalogue (`10` plugins, `23` skills) with one-tap install and uninstall under **Settings ➔ Skills & Plugins**.
 - **Voice mode** — on-device speech recognition, cloud transcription (Whisper / Gemini), and native text-to-speech.
 - **Built-in terminal** — PTY bash shell, `pkg` package manager, and `agy-daemon` background task scheduler.
 - **Android UX & lifecycle** — dark/light theme sync, wake lock, file picker, bottom sheets, and a persistent status bar notification with a **Stop** button.
@@ -47,7 +47,7 @@
    ```bash
    pkg update && pkg install git python nodejs bash
    ```
-4. Configure API keys under **Settings ➔ AI Models & API Keys**, or browse extensions under **Settings ➔ Customizations**.
+4. Configure API keys under **Settings ➔ AI Models & API Keys**, or browse extensions under **Settings ➔ Skills & Plugins**.
 
 ## Build from Source
 
