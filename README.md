@@ -1,55 +1,75 @@
-# Antigravity for Android
+<div align="center">
+  <img src="docs/assets/logo.png" alt="Antigravity for Android" width="72" />
+  <h1>Antigravity for Android</h1>
+  <p>
+    Run the <strong>Antigravity AI coding agent on Android</strong> (ARM64 APK).<br />
+    Antigravity <strong>v2.34.0</strong> (Linux ARM64) runs natively on Android Bionic — no PRoot or chroot.
+  </p>
+  <p>
+    <a href="https://github.com/Comzvy/antigravity-arm64-android/releases/latest"><img src="https://img.shields.io/github/v/release/Comzvy/antigravity-arm64-android?style=flat-square&color=38bdf8" alt="Release" /></a>
+    <a href="https://github.com/Comzvy/antigravity-arm64-android/actions/workflows/build-and-release.yml"><img src="https://img.shields.io/github/actions/workflow/status/Comzvy/antigravity-arm64-android/build-and-release.yml?branch=main&style=flat-square&label=CI" alt="CI" /></a>
+    <img src="https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=flat-square" alt="Android 7.0+" />
+    <img src="https://img.shields.io/badge/ARM64-v8.0%2B-6366F1?style=flat-square" alt="ARM64 v8.0+" />
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-F59E0B?style=flat-square" alt="License" /></a>
+  </p>
+  <p>
+    <strong><a href="https://github.com/Comzvy/antigravity-arm64-android/releases/latest">Download APK</a></strong>
+    &nbsp;·&nbsp;
+    <a href="RELEASE_NOTES.md">Release Notes</a>
+    &nbsp;·&nbsp;
+    <a href="#quick-start">Quick Start</a>
+    &nbsp;·&nbsp;
+    <a href="#build-from-source">Build</a>
+  </p>
+</div>
 
-Run the **Antigravity AI coding agent on Android** (ARM64 APK). Antigravity v2.34.0 (Linux ARM64) runs **natively on Android (Bionic)**, with no PRoot or chroot. Includes a multi-provider AI gateway (Gemini, OpenAI, Claude), voice mode, built-in skills & plugins catalogue, and web terminal.
+<br />
 
-[![Release](https://img.shields.io/github/v/release/Comzvy/antigravity-arm64-android?style=flat-square&color=38bdf8)](https://github.com/Comzvy/antigravity-arm64-android/releases/latest)
-![Android](https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=flat-square)
-![ARM64](https://img.shields.io/badge/ARM64-v8.0%2B-6366F1?style=flat-square)
-[![License](https://img.shields.io/badge/License-Apache--2.0-F59E0B?style=flat-square)](LICENSE)
-
-**[Download APK](https://github.com/Comzvy/antigravity-arm64-android/releases/latest)** · [Release Notes](RELEASE_NOTES.md)
-
-<img alt="Antigravity for Android" src="docs/assets/hero_dark.png" width="100%" />
+<p align="center">
+  <img alt="Antigravity for Android interface" src="docs/assets/hero_dark.png" width="100%" />
+</p>
 
 ## Features
 
-- **Native core**: `language_server` runs directly on Bionic with `liblse_compat.so` (LSE emulation).
-- **Multi-provider AI (BYOK)**: Gemini, OpenAI, Claude, OpenRouter, Groq, DeepSeek, or any OpenAI-compatible endpoint.
-- **Voice mode**: speech recognition, cloud transcription, and text-to-speech.
-- **Web terminal**: PTY bash, the `pkg` package manager, and the `agy-daemon` scheduler.
-- **Mobile UX**: theme sync, wake lock, file picker, bottom sheets, persistent status bar notification with **Stop** control.
-- **Skills & Plugins Catalogue**: built-in Beta catalogue (`10` plugins, `23` skills) with one-tap install/uninstall via `CatalogueManager`.
-- **Shizuku**: elevated ADB shell (`rish`) and notifications (`agy-notify`).
+- **Native Bionic core** — runs Antigravity v2.34.0 (`language_server`) directly on Android ARM64 with `liblse_compat.so` (ARMv8.0-A+ LSE/SIMD emulation, no PRoot/chroot).
+- **Multi-provider AI (BYOK)** — Gemini, OpenAI, Anthropic Claude, OpenRouter, Groq, DeepSeek, or any OpenAI/Anthropic-compatible endpoint.
+- **Skills & Plugins Catalogue** — built-in catalogue (`10` plugins, `23` skills) with one-tap install and uninstall under **Settings ➔ Customizations**.
+- **Voice mode** — on-device speech recognition, cloud transcription (Whisper / Gemini), and native text-to-speech.
+- **Built-in terminal** — PTY bash shell, `pkg` package manager, and `agy-daemon` background task scheduler.
+- **Android UX & lifecycle** — dark/light theme sync, wake lock, file picker, bottom sheets, and a persistent status bar notification with a **Stop** button.
+- **Shizuku integration** — optional elevated ADB shell (`rish`) and status bar notifications (`agy-notify`).
 
 ## Quick Start
 
-1. Download `antigravity.apk` from the [latest release](https://github.com/Comzvy/antigravity-arm64-android/releases/latest).
-2. Grant **All Files Access**, and **Microphone** if you use voice mode (optional: Shizuku).
-3. In the built-in terminal:
+1. Download `antigravity.apk` from the [latest release](https://github.com/Comzvy/antigravity-arm64-android/releases/latest) (Android 7.0+ ARM64; installs cleanly over existing `v2.x` builds).
+2. Grant **All Files Access**, and **Microphone** if using voice mode (optional: Shizuku).
+3. Install CLI tools inside the built-in terminal:
    ```bash
    pkg update && pkg install git python nodejs bash
    ```
-4. Add your API keys under **Settings ➔ AI Models & API Keys**.
+4. Configure API keys under **Settings ➔ AI Models & API Keys**, or browse extensions under **Settings ➔ Customizations**.
 
 ## Build from Source
 
 ```bash
-bash build.sh          # dist/antigravity.apk
-bash build.sh --dev    # dist/antigravity-dev.apk
-bash test_all_modules.sh
+bash build.sh            # dist/antigravity.apk (production, com.agy, port 45157)
+bash build.sh --dev      # dist/antigravity-dev.apk
+bash test_all_modules.sh # full modular & live core test suite
 ```
 
 ## Structure
 
-| Folder | Contents |
+| Directory | Purpose |
 | :--- | :--- |
-| [`app/`](app/) | Android host (Activities, WebView, AI router, services) |
-| [`web/`](web/) | Workbench UI and JS patches |
-| [`modules/`](modules/) | APK builder, runtime, ELF patchers, runner |
-| [`env/`](env/) | Userspace scripts, `pkg`, `agy-daemon` |
-| [`config/`](config/) | Version and runtime constants |
-| [`docs/`](docs/) | Image assets |
+| [`app/`](app/) | Android host — Activities, WebView bridge, AI router, `CatalogueManager`, foreground service |
+| [`web/`](web/) | Workbench UI bundle and modular JS patches |
+| [`modules/`](modules/) | APK builder, runtime packager, ELF binary patchers, standalone runner |
+| [`env/`](env/) | Bionic userspace bootstrap, `pkg` manager, `agy-daemon` |
+| [`config/`](config/) | Version, build, and runtime constants |
+| [`docs/`](docs/) | Logo and screenshot assets |
 
 ---
 
-<sub>Maintained by [Comzvy](https://github.com/Comzvy) · Licensed under [Apache-2.0](LICENSE)</sub>
+<p align="center">
+  <sub>Maintained by <a href="https://github.com/Comzvy">Comzvy</a> · Licensed under <a href="LICENSE">Apache-2.0</a></sub>
+</p>

@@ -154,25 +154,27 @@ jobs:
           body: |
             ## Antigravity for Android
 
-            Autonomous AI coding workstation running natively on Android ARM64 Bionic userspace.
+            Native Android ARM64 port of Antigravity running directly on Bionic userspace — no PRoot or chroot.
 
             ### Downloads
 
             | Artifact | Package ID | Description |
             | :--- | :--- | :--- |
-            | **`antigravity.apk`** | `com.agy` | Standard production release (`port 45157`) |
+            | **`antigravity.apk`** | `com.agy` | Production release (`port 45157`, Android 7.0+ ARM64) |
             | **`SHA256SUMS.txt`** | — | SHA-256 checksum for package verification |
 
-            ### Highlights
+            ### What's New in v2.34.0
 
-            - **Core v2.34.0 (Linux ARM64 Port):** Runs `language_server` natively in Android Bionic userspace with `wsTransport=3` WebSocket multiplexing and automatic agent stream resync.
-            - **Skills & Plugins Catalogue:** Browse and one-tap install 10 plugins (`rtk`, `antislop`, `superpowers`, `impeccable`, `context-mode`, `agents-suite`, `planning-with-files`, `sepia`, `gemini-agent-skills`, `antigravity-skills-manager`) and 23 skills directly under Settings → Customizations.
-            - **Persistent Service Control:** Non-dismissible status bar notification while active with a direct **Stop** button for clean shutdown of core, gateway, and background daemon.
-            - **Multi-Provider AI Gateway (BYOK):** Configure **Google Gemini**, **OpenAI**, **Anthropic Claude** (including custom Anthropic endpoints), **OpenRouter**, **Groq**, **DeepSeek**, or custom OpenAI-compatible servers.
-            - **Voice Mode & AudioWorklet:** Real-time `SpeechRecognizer`, `RecognizerIntent` fallback, 16 kHz PCM WebAudio capture with AudioWorklet CSP support, cloud Whisper/Gemini transcription, and native TTS.
-            - **Built-in Web Terminal & PTY Support:** Native shell execution (`$PREFIX/bin/bash` -> `runtime/bin/bash` -> `/system/bin/sh`) with `xterm-256color` terminfo.
-            - **ARMv8.0-A Compatibility (`liblse_compat.so`):** Transparent atomic & SIMD emulation for FEAT_LSE, FEAT_RDM, and FEAT_FCMA on older ARMv8.0-A SoCs.
-            - **Android Native Integrations:** Dynamic Dark/Light theme sync, Keep Screen Awake, background/lockscreen persistence (`PARTIAL_WAKE_LOCK` + `WIFI_MODE_FULL_LOW_LATENCY`), universal media/file picker, Shizuku (`rish`) elevated shell, `agy-daemon`, and `pkg` package manager.
+            - **Upstream v2.34.0 Core & Web Sync:** Updated native ARM64 `language_server` (`go1.28-20261102-RC01`), web workbench assets, binary patchers (`crash_suppressor`, `nosandbox`), and `web/patch_main.py`.
+            - **Skills & Plugins Catalogue:** Browse and one-tap install `10` plugins (`rtk`, `antislop`, `superpowers`, `impeccable`, `context-mode`, `agents-suite`, `planning-with-files`, `sepia`, `gemini-agent-skills`, `antigravity-skills-manager`) and `23` skills under **Settings ➔ Customizations**.
+            - **Persistent Notification with Stop Control:** Status bar notification stays pinned while active and includes a **Stop** button for clean shutdown of the app, core server, HTTP gateway, wake locks, and `agy-daemon`.
+
+            ### Core Capabilities
+
+            - **Multi-Provider AI Gateway (BYOK):** Google Gemini, OpenAI, Anthropic Claude (incl. custom Anthropic endpoints), OpenRouter, Groq, DeepSeek, or any OpenAI-compatible endpoint.
+            - **Voice Mode & AudioWorklet:** Real-time `SpeechRecognizer`, 16 kHz PCM cloud transcription (Whisper / Gemini), and native TTS.
+            - **Built-in Web Terminal & Shizuku:** PTY bash shell, `pkg` package manager, `agy-daemon` scheduler, and elevated ADB shell (`rish`).
+            - **ARMv8.0-A Compatibility:** Transparent atomic & SIMD emulation (`liblse_compat.so`) for devices without hardware LSE.
 
             > [!NOTE]
-            > **Seamless Upgrades:** Signed with the repository keystore so you can install directly over previous `v2.x` releases without losing local data.
+            > **Seamless Upgrades:** Signed with the repository keystore so you can install directly over previous `v2.x` releases without losing local data. See [RELEASE_NOTES.md](https://github.com/Comzvy/antigravity-arm64-android/blob/main/RELEASE_NOTES.md) for the full changelog.

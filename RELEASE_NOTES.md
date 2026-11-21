@@ -9,8 +9,17 @@
 ### Notification & Lifecycle Control
 - **Persistent Notification with Stop Action:** Added a **Stop** action (`ic_notification_stop` -> `CoreServerService.ACTION_STOP_APP`) to `ForegroundNotification`, pinned with `FLAG_ONGOING_EVENT | FLAG_NO_CLEAR` + `FOREGROUND_SERVICE_IMMEDIATE` and guarded via `ACTION_REPOST_NOTIFICATION` so it cannot be swiped clear while active. Tapping **Stop** cleanly terminates the Activity, foreground notification, core server, HTTP gateway, wake locks, and `agy-daemon`.
 
-### Built-in Skills & Plugins Catalogue
+### Skills & Plugins Catalogue
 - **Skills & Plugins Catalogue (`10` Plugins, `23` Skills):** Added the Beta APK catalogue UI (`web/generated/patches/catalogue.js`) backed by `CatalogueManager` (`com.agy.plugins`) and `AndroidBridge` (`listInstalledCatalogue`, `installCatalogueItem`, `uninstallCatalogueItem`, `restartCoreForCatalogue`) supporting built-in skill installation, safe GitHub archive extraction, and RTK binary setup.
+
+### Release Package
+
+| Artifact | Package ID | Runtime Port | Description |
+| :--- | :--- | :--- | :--- |
+| **`antigravity.apk`** | `com.agy` | `45157` | Standard production release. |
+| **`SHA256SUMS.txt`** | — | — | Cryptographic SHA-256 checksum for verification. |
+
+---
 
 ## v2.33.0
 
@@ -29,10 +38,3 @@
 - **Voice Mode & AudioWorklet CSP:** Fixed microphone capture and `AudioWorklet` CSP handling alongside real-time `SpeechRecognizer`, `RecognizerIntent` dialog fallback, 16 kHz PCM WebAudio cloud transcription (Gemini Audio / Groq Whisper / OpenAI Whisper), and native `TextToSpeech`.
 - **Android UI & Lifecycle:** Dynamic Dark/Light system theme sync, `FLAG_KEEP_SCREEN_ON`, `PARTIAL_WAKE_LOCK` + `WIFI_MODE_FULL_LOW_LATENCY` lockscreen persistence, universal media/file picker, tactile haptics, smart double-back exit guard, and responsive bottom-sheet modals.
 - **Remote GitHub Project Loading & Diagnostics:** Eager remote GitHub project loading in `OnboardingSeeder` / `WebViewLifecycle`, one-tap log export overlay, Shizuku (`rish`) elevated shell, Torch bridge, `pkg` manager, and `agy-daemon` background task engine.
-
-### Release Package
-
-| Artifact | Package ID | Runtime Port | Description |
-| :--- | :--- | :--- | :--- |
-| **`antigravity.apk`** | `com.agy` | `45157` | Standard production release. |
-| **`SHA256SUMS.txt`** | — | — | Cryptographic SHA-256 checksum for verification. |
