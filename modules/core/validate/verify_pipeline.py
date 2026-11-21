@@ -30,7 +30,7 @@ import manifest_verifier
 
 def run_pipeline():
     print("=" * 60)
-    print("  ANTIGRAVITY NEW CORE VERIFICATION PIPELINE (v2.33.0)")
+    print("  ANTIGRAVITY NEW CORE VERIFICATION PIPELINE (v2.34.0)")
     print("=" * 60)
 
     # 1. Check specs
@@ -52,7 +52,7 @@ def run_pipeline():
         size_bytes = os.path.getsize(staged_bin)
         print(f"  [OK] Extracted core binary: {size_bytes:,} bytes")
 
-        expected_binary_sha = "9772a2fd0d7654b317d439afec450a051018d0c69c9fb96e642a801846170fec"
+        expected_binary_sha = "384fd3a5a467a136c44cd32d148ec75cd165ca6fbcb8aa57166cf7c7e59421d2"
         checksum_checker.verify_checksum(staged_bin, expected_binary_sha)
         print("  [OK] Extracted core binary SHA-256 match confirmed.")
 

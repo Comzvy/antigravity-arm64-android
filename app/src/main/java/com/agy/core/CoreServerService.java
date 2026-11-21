@@ -11,6 +11,7 @@ import com.agy.runtime.RuntimeManager;
 
 import java.io.File;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Foreground host for the patched core (language_server). Holds a wake lock,
@@ -20,7 +21,14 @@ import java.util.concurrent.TimeUnit;
 public final class CoreServerService extends Service {
 
     private static final String TAG = "CoreServer";
+    public static final String ACTION_STOP_APP =
+            com.agy.BuildConfig.APPLICATION_ID + ".action.STOP_APP";
+    public static final String ACTION_REPOST_NOTIFICATION =
+            com.agy.BuildConfig.APPLICATION_ID + ".action.REPOST_NOTIFICATION";
+
     private static volatile CoreServerService activeService;
+    private static final Handler PROCESS_EXIT_HANDLER = new Handler(Looper.getMainLooper());
+    private static Runnable pendingProcessExit;
 
     private RuntimeManager runtime;
     private WakeLockHolder wakeLock;
@@ -29,7 +37,31 @@ public final class CoreServerService extends Service {
     private com.agy.log.LogRingBuffer logBuffer;
     private com.agy.gateway.SystemGatewayServer gatewayServer;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final AtomicBoolean cleanedUp = new AtomicBoolean(false);
     private volatile boolean destroyed;
+    private volatile boolean stoppingByUser;
+
+    /** Cancels any scheduled process termination when the app or service restarts. */
+    public static synchronized void cancelPendingProcessExit() {
+        if (pendingProcessExit != null) {
+            PROCESS_EXIT_HANDLER.removeCallbacks(pendingProcessExit);
+            pendingProcessExit = null;
+        }
+    }
+
+    private static synchronized void scheduleProcessExit() {
+        cancelPendingProcessExit();
+        pendingProcessExit = new Runnable() {
+            @Override
+            public void run() {
+                synchronized (CoreServerService.class) {
+                    pendingProcessExit = null;
+                }
+                android.os.Process.killProcess(android.os.Process.myPid());
+            }
+        };
+        PROCESS_EXIT_HANDLER.postDelayed(pendingProcessExit, 250);
+    }
 
     /** Restarts the running core process or starts CoreServerService if not running. */
     public static boolean restartCore(android.content.Context context) {
@@ -48,7 +80,12 @@ public final class CoreServerService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        cancelPendingProcessExit();
         activeService = this;
+        destroyed = false;
+        stoppingByUser = false;
+        cleanedUp.set(false);
+
         runtime = new RuntimeManager(this);
         logBuffer = new com.agy.log.LogRingBuffer();
         gatewayServer = new com.agy.gateway.SystemGatewayServer(this, logBuffer, com.agy.BuildConfig.GATEWAY_PORT);
@@ -64,7 +101,7 @@ public final class CoreServerService extends Service {
         CoreRuntimeState.lastError = null;
         CoreRuntimeState.serverUrl = null;
 
-        ForegroundNotification.start(this);
+        ForegroundNotification.start(this, "Core running");
         wakeLock = new WakeLockHolder();
         wakeLock.acquire(this);
 
@@ -83,6 +120,9 @@ public final class CoreServerService extends Service {
             try {
                 // Give runtime environment a brief moment to stabilize
                 Thread.sleep(1500);
+                if (destroyed || stoppingByUser) {
+                    return;
+                }
                 File daemonBin = new File(getFilesDir(), "usr/bin/agy-daemon");
                 if (daemonBin.canExecute()) {
                     Log.i(TAG, "Starting autonomous background daemon...");
@@ -122,7 +162,7 @@ public final class CoreServerService extends Service {
         mainHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (destroyed) {
+                if (destroyed || stoppingByUser) {
                     return;
                 }
                 CoreRuntimeState.serverUrl = null;
@@ -145,17 +185,14 @@ public final class CoreServerService extends Service {
         });
     }
 
-    @Override
-    public void onDestroy() {
-        if (activeService == this) {
-            activeService = null;
+    private void cleanupCoreResources() {
+        if (!cleanedUp.compareAndSet(false, true)) {
+            return;
         }
-        stopBackgroundDaemon();
+        mainHandler.removeCallbacksAndMessages(null);
         if (gatewayServer != null) {
             gatewayServer.stop();
         }
-        destroyed = true;
-        mainHandler.removeCallbacksAndMessages(null);
         // Intentional stop: the watchdog must not treat the exit as a crash.
         if (supervisor != null) {
             supervisor.stop();
@@ -172,11 +209,55 @@ public final class CoreServerService extends Service {
         CoreRuntimeState.serverUrl = null;
         CoreRuntimeState.lastError = null;
         CoreRuntimeState.restarting = false;
+    }
+
+    private void handleStopApp() {
+        if (stoppingByUser) {
+            return;
+        }
+        Log.i(TAG, "Stop App requested from status bar notification");
+        stoppingByUser = true;
+        destroyed = true;
+        com.agy.ui.MainActivity.finishAndRemoveTaskSafely();
+        ForegroundNotification.cancel(this);
+        cleanupCoreResources();
+        new Thread(() -> {
+            stopBackgroundDaemon();
+            mainHandler.post(() -> {
+                ForegroundNotification.cancel(CoreServerService.this);
+                stopSelf();
+                scheduleProcessExit();
+            });
+        }, "AgyStopThread").start();
+    }
+
+    @Override
+    public void onDestroy() {
+        if (activeService == this) {
+            activeService = null;
+        }
+        destroyed = true;
+        ForegroundNotification.cancel(this);
+        if (!stoppingByUser) {
+            stopBackgroundDaemon();
+        }
+        cleanupCoreResources();
         super.onDestroy();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        String action = intent != null ? intent.getAction() : null;
+        if (ACTION_STOP_APP.equals(action)) {
+            handleStopApp();
+            return START_NOT_STICKY;
+        }
+        if (ACTION_REPOST_NOTIFICATION.equals(action)) {
+            if (!destroyed && !stoppingByUser) {
+                ForegroundNotification.repostIfActive(this);
+            }
+            return START_STICKY;
+        }
         return START_STICKY;
     }
 

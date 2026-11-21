@@ -135,9 +135,29 @@ public class MainActivity extends Activity
         }
     }
 
+    public static void finishAndRemoveTaskSafely() {
+        final MainActivity act = activeActivity;
+        if (act != null) {
+            act.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        act.finishAndRemoveTask();
+                    } catch (Throwable ignored) {
+                        try {
+                            act.finishAffinity();
+                        } catch (Throwable ignored2) {
+                        }
+                    }
+                }
+            });
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        com.agy.core.CoreServerService.cancelPendingProcessExit();
         activeActivity = this;
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);

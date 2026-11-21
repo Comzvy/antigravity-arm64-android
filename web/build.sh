@@ -173,17 +173,19 @@ let content = fs.readFileSync(filePath, "utf8");
 
 // 1. patch_appearance
 if (!content.includes("Desktop Mode") && !content.includes("ag_desktop_mode")) {
-  const hookRe = /(var\s+[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==3,\s*[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==2,\s*[A-Za-z0-9_$]+=[A-Za-z0-9_$]+=>\s*[A-Za-z0-9_$]+=>\{.*?\};)|([A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==3;var\s+[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==2;)(?=return\s+[A-Za-z0-9_$]+\.createElement\([^,]+,null,[A-Za-z0-9_$]+\.createElement\([^,]+,\{title:"Appearance"\})/;
-  const hm = hookRe.exec(content);
   const tIdx = content.indexOf('{label:"Theme"');
-  let tm = null, reactId = "D";
+  let hm = null, tm = null, reactId = "D", winStart = 0;
   if (tIdx !== -1) {
-    const win = content.slice(Math.max(0, tIdx - 100), Math.min(content.length, tIdx + 500));
+    winStart = Math.max(0, tIdx - 600);
+    const win = content.slice(winStart, Math.min(content.length, tIdx + 500));
+    const hookReV233 = /([A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==3;var\s+[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==2;)(?=return\s+[A-Za-z0-9_$]+\.createElement\([^,]+,null,[A-Za-z0-9_$]+\.createElement\([^,]+,\{title:"Appearance"\})/;
+    const hookReV211 = /(var\s+[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==3,\s*[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==2,\s*[A-Za-z0-9_$]+=[A-Za-z0-9_$]+=>\s*[A-Za-z0-9_$]+=>\{[^}]{0,400}\};)/;
+    hm = hookReV233.exec(win) || hookReV211.exec(win);
     tm = /([A-Za-z0-9_$]+)\.createElement\(([A-Za-z0-9_$]+),\{label:"Theme",.*?onSelect:[A-Za-z0-9_$]+\}\)/.exec(win);
     if (tm) reactId = tm[1];
   }
   if (!hm || !tm) throw new Error("appearance patterns not matched");
-  const origHook = hm[0];
+  const origHook = hm[1];
   const injHook =
     `var [isDesktop,setIsDesktop]=(0,${reactId}.useState)(()=>{try{if(window.Android&&typeof window.Android.isDesktopMode==='function')return window.Android.isDesktopMode();var s=localStorage.getItem('ag_desktop_mode');return s===null?!1:s==='true'}catch(_){return !1}});` +
     `var onDesktopToggle=(0,${reactId}.useCallback)(v=>{setIsDesktop(v);try{localStorage.setItem('ag_desktop_mode',String(v));if(window.Android&&typeof window.Android.setDesktopMode==='function')window.Android.setDesktopMode(v)}catch(_){}},[]);` +
@@ -199,7 +201,9 @@ if (!content.includes("Desktop Mode") && !content.includes("ag_desktop_mode")) {
   const injTheme = origTheme +
     `,${reactId}.createElement(${itemComp},{label:"Desktop Mode",description:"Use desktop viewport and user agent for the workspace",rightElement:${reactId}.createElement(${switchComp},{checked:isDesktop,onCheckedChange:onDesktopToggle})})` +
     `,${reactId}.createElement(${itemComp},{label:"AI Models & API Keys",description:"Use Gemini, OpenAI, Claude, OpenRouter, DeepSeek, Groq, or Custom API Keys",rightElement:${reactId}.createElement("button",{type:"button",onClick:()=>{if(window.__agOpenAiModelsModal)window.__agOpenAiModelsModal()},className:"px-3 py-1 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 cursor-pointer"},"Manage Keys")})`;
-  content = content.replace(origHook, injHook).replace(origTheme, injTheme);
+  const hookAbsStart = winStart + hm.index;
+  const hookAbsEnd = hookAbsStart + origHook.length;
+  content = (content.slice(0, hookAbsStart) + injHook + content.slice(hookAbsEnd)).replace(origTheme, injTheme);
 }
 
 // 2. patch_voice_input
@@ -254,7 +258,7 @@ content = content.replaceAll(
 // 4. patch_mcp_plugins_fallback
 if (!content.includes("__agMcpPluginsFallback")) {
   content = content.replace(
-    /getAvailableCascadePlugins:async\s+([A-Za-z0-9_$]+)=>f\(([A-Za-z0-9_$]+)=>\2\.getAvailableCascadePlugins\(([A-Za-z0-9_$]+)\(([A-Za-z0-9_$]+),\1\)\)\),getBuildWithGooglePlugins:async\(\)=>f\(([A-Za-z0-9_$]+)=>\5\.getBuildWithGooglePlugins\(\3\(([A-Za-z0-9_$]+),\{\}\)\)\),downloadBuildWithGooglePlugin:async\s+([A-Za-z0-9_$]+)=>f\(async\s+([A-Za-z0-9_$]+)=>\{var\s+([A-Za-z0-9_$]+)=\3\(([A-Za-z0-9_$]+)\);\9\.pluginId=\7\.uid;return\s+\8\.downloadBuildWithGooglePlugin\(\9\)\}\),deletePlugin:async\s+([A-Za-z0-9_$]+)=>f\(async\s+([A-Za-z0-9_$]+)=>\{var\s+([A-Za-z0-9_$]+)=\3\(([A-Za-z0-9_$]+)\);\s*\13\.pluginId=\11\.pluginId;return\s+\12\.deletePlugin\(\13\)\}\)/,
+    /getAvailableCascadePlugins:async\s+([A-Za-z0-9_$]+)=>f\(([A-Za-z0-9_$]+)=>\2\.getAvailableCascadePlugins\(([A-Za-z0-9_$]+)\(([A-Za-z0-9_$]+),\1\)\)\),\s*getBuildWithGooglePlugins:async\(\)=>f\(([A-Za-z0-9_$]+)=>\5\.getBuildWithGooglePlugins\(\3\(([A-Za-z0-9_$]+),\{\}\)\)\),\s*downloadBuildWithGooglePlugin:async\s+([A-Za-z0-9_$]+)=>f\(async\s+([A-Za-z0-9_$]+)=>\{var\s+([A-Za-z0-9_$]+)=\3\(([A-Za-z0-9_$]+)\);\9\.pluginId=\7\.uid;return\s+\8\.downloadBuildWithGooglePlugin\(\9\)\}\),\s*deletePlugin:async\s+([A-Za-z0-9_$]+)=>f\(async\s+([A-Za-z0-9_$]+)=>\{var\s+([A-Za-z0-9_$]+)=\3\(([A-Za-z0-9_$]+)\);\s*\13\.pluginId=\11\.pluginId;return\s+\12\.deletePlugin\(\13\)\}\)/,
     (_, u1, v1, cfn, tAvail, u2, tBwg, u3, v3, w3, tDl, u4, v4, w4, tDel) =>
       `getAvailableCascadePlugins:async ${u1}=>{try{var r=await f(${v1}=>${v1}.getAvailableCascadePlugins(${cfn}(${tAvail},${u1})));if(r&&r.plugins&&r.plugins.length>0)return r}catch(_){}return window.__agMcpPluginsFallback?window.__agMcpPluginsFallback.getAvailableCascadePlugins(${u1}):{plugins:[]}},` +
       `getBuildWithGooglePlugins:async()=>{try{var r=await f(${u2}=>${u2}.getBuildWithGooglePlugins(${cfn}(${tBwg},{})));if(r&&r.plugins&&r.plugins.length>0)return r}catch(_){}return window.__agMcpPluginsFallback?window.__agMcpPluginsFallback.getBuildWithGooglePlugins():{plugins:[]}},` +

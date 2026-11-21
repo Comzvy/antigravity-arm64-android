@@ -66,6 +66,13 @@ src/patches/ai_models_menu/inject.js
 src/patches/ai_models_menu/mcp_plugins_fallback.js
 src/patches/ai_models_menu/public-api.js
 
+bundle iife patches/catalogue.js
+src/patches/catalogue/config.js
+src/patches/catalogue/styles.js
+src/patches/catalogue/modal.js
+src/patches/catalogue/inject.js
+src/patches/catalogue/public-api.js
+
 bundle iife patches/voice_input.js
 src/patches/voice_input/config.js
 src/patches/voice_input/wav.js

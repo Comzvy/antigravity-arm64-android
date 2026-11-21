@@ -1,6 +1,6 @@
 # Antigravity for Android
 
-Run the **Antigravity AI coding agent on Android** (ARM64 APK). Antigravity v2.33.0 (Linux ARM64) runs **natively on Android (Bionic)**, with no PRoot or chroot. Includes a multi-provider AI gateway (Gemini, OpenAI, Claude), voice mode, and a built-in web terminal.
+Run the **Antigravity AI coding agent on Android** (ARM64 APK). Antigravity v2.34.0 (Linux ARM64) runs **natively on Android (Bionic)**, with no PRoot or chroot. Includes a multi-provider AI gateway (Gemini, OpenAI, Claude), voice mode, built-in skills & plugins catalogue, and web terminal.
 
 [![Release](https://img.shields.io/github/v/release/Comzvy/antigravity-arm64-android?style=flat-square&color=38bdf8)](https://github.com/Comzvy/antigravity-arm64-android/releases/latest)
 ![Android](https://img.shields.io/badge/Android-7.0%2B-3DDC84?style=flat-square)
@@ -17,7 +17,8 @@ Run the **Antigravity AI coding agent on Android** (ARM64 APK). Antigravity v2.3
 - **Multi-provider AI (BYOK)**: Gemini, OpenAI, Claude, OpenRouter, Groq, DeepSeek, or any OpenAI-compatible endpoint.
 - **Voice mode**: speech recognition, cloud transcription, and text-to-speech.
 - **Web terminal**: PTY bash, the `pkg` package manager, and the `agy-daemon` scheduler.
-- **Mobile UX**: theme sync, wake lock, file picker, bottom sheets.
+- **Mobile UX**: theme sync, wake lock, file picker, bottom sheets, persistent status bar notification with **Stop** control.
+- **Skills & Plugins Catalogue**: built-in Beta catalogue (`10` plugins, `23` skills) with one-tap install/uninstall via `CatalogueManager`.
 - **Shizuku**: elevated ADB shell (`rish`) and notifications (`agy-notify`).
 
 ## Quick Start

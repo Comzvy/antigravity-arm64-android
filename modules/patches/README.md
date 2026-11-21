@@ -43,9 +43,9 @@ modules/patches/
 | **syscalls** | `fchmodat` | `syscall.fchmodat2` (sys_452: `0xd2803880`) | Ретаргетинг на `fchmodat` (sys_53: `0xd28006a0`) |
 | **sigill** | `sigill_handler` | Вызов `rt_sigaction` в рантайме Go | Игнорирование сигнала `SIGILL` (4) для сохранения обработчика `liblse_compat.so` |
 | **resolv** | `resolv_redirect` | Строка `/etc/resolv.conf` (16 байт) | Замена на `etc//resolv.conf` без изменения длины |
-| **failfast** | `crash_suppressor` | ARMv8.0-A CPU feature check (`0x7701180`) & preinit atomic (`0x7765c60`) | Branch `b +0x64` в обход проверки LSE/CRC/AES и замена `ldaddal` на `ldr`/`str` для полной совместимости с процессорами ARMv8.0-A (Snapdragon 660 и др., без аппаратного LSE) |
+| **failfast** | `crash_suppressor` | ARMv8.0-A CPU feature check (`adrp`+`ldr`+`CPU_TAIL`/`CPU_EPILOGUE` в `PT_LOAD` `PF_X`) & preinit atomic (`ATOMIC_TAIL_RAW` + `adrp`/`add`) | Маскированный поиск в исполняемых сегментах ELF, branch `b +0x64` в обход проверки LSE/CRC/AES и замена `ldaddal` на `ldr`/`str` с сохранением PC-relative адресации `adrp+add` |
 | **pty_shell** | `pty_shell` | Строка `/bin/bash` (9 байт) | Ретаргетинг на `/bin///sh` для совместимости с Android |
-| **pty_shell** | `nosandbox` | `exebox.newBox` & `RunCommandHandler.isSandboxEnabled` | Принудительное `NoSandbox=true` и `isSandboxEnabled=false` (предотвращает `libloader.so: invalid argument` в `sbox`) |
+| **pty_shell** | `nosandbox` | `exebox.newBox` & `RunCommandHandler.isSandboxEnabled` (двойные сигнатуры v2.33.0 + v2.34.0) | Принудительное `NoSandbox=true` и `isSandboxEnabled=false` (предотвращает `libloader.so: invalid argument` в `sbox`) |
 
 ---
 

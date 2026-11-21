@@ -214,6 +214,77 @@ public final class AndroidBridge {
         com.agy.voice.VoiceBridge.stopSpeaking();
     }
 
+    /** Lists installed plugins, custom skills, and built-in skills as JSON. */
+    @JavascriptInterface
+    public String listInstalledCatalogue(String token) {
+        if (!matchesNativeBridgeToken(token)) {
+            return "{\"ok\":false,\"error\":\"Unauthorized bridge call\"}";
+        }
+        return com.agy.plugins.CatalogueManager.listInstalledJson(appContext);
+    }
+
+    /** Installs a plugin or skill asynchronously and streams progress events to window.__onAgCatalogueEvent. */
+    @JavascriptInterface
+    public String installCatalogueItem(String token, String itemJson) {
+        if (!matchesNativeBridgeToken(token)) {
+            return "{\"ok\":false,\"error\":\"Unauthorized bridge call\"}";
+        }
+        return com.agy.plugins.CatalogueManager.installAsync(appContext, itemJson,
+                new com.agy.plugins.CatalogueManager.EventEmitter() {
+                    @Override
+                    public void emit(final String jobId, final String id, final boolean isPlugin,
+                                     final String status, final String message,
+                                     final boolean done, final boolean ok) {
+                        final MainActivity act = activityRef != null ? activityRef.get() : MainActivity.activeActivity;
+                        if (act == null) {
+                            return;
+                        }
+                        act.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                android.webkit.WebView wv = act.getWebView();
+                                if (wv == null) {
+                                    return;
+                                }
+                                try {
+                                    org.json.JSONObject ev = new org.json.JSONObject();
+                                    ev.put("jobId", jobId != null ? jobId : "");
+                                    ev.put("id", id != null ? id : "");
+                                    ev.put("isPlugin", isPlugin);
+                                    ev.put("status", status != null ? status : "");
+                                    ev.put("message", message != null ? message : "");
+                                    ev.put("done", done);
+                                    ev.put("ok", ok);
+                                    wv.evaluateJavascript(
+                                            "window.__onAgCatalogueEvent && window.__onAgCatalogueEvent("
+                                                    + ev.toString() + ");",
+                                            null);
+                                } catch (Throwable ignored) {
+                                }
+                            }
+                        });
+                    }
+                });
+    }
+
+    /** Uninstalls an installed plugin or skill under ~/.gemini/config/{plugins,skills}/<id>. */
+    @JavascriptInterface
+    public String uninstallCatalogueItem(String token, String id, boolean isPlugin) {
+        if (!matchesNativeBridgeToken(token)) {
+            return "{\"ok\":false,\"error\":\"Unauthorized bridge call\"}";
+        }
+        return com.agy.plugins.CatalogueManager.uninstall(appContext, id, isPlugin);
+    }
+
+    /** Restarts language_server so newly installed/removed skills and plugins are indexed. */
+    @JavascriptInterface
+    public boolean restartCoreForCatalogue(String token) {
+        if (!matchesNativeBridgeToken(token)) {
+            return false;
+        }
+        return com.agy.core.CoreServerService.restartCore(appContext);
+    }
+
     /** Installs a local plugin folder under ~/.gemini/config/plugins/<uid> for Gateway/API Key mode. */
     @JavascriptInterface
     public String installLocalPlugin(String token, String uid, String name, String description) {

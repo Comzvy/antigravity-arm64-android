@@ -10,9 +10,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (e.g. v2.33.0)'
+        description: 'Release Tag (e.g. v2.34.0)'
         required: false
-        default: 'v2.33.0'
+        default: 'v2.34.0'
       draft:
         description: 'Create Draft Release'
         type: boolean
@@ -76,11 +76,11 @@ jobs:
             fi
           fi
 
-          # 2. Hydrate pristine Antigravity v2.33.0 Linux ARM64 language_server if absent
+          # 2. Hydrate pristine Antigravity v2.34.0 Linux ARM64 language_server if absent
           if [ ! -f "modules/core/pristine/language_server.tar.gz" ]; then
-            echo "[CI] Downloading Antigravity v2.33.0 Linux ARM64 language_server..."
-            curl -fsSL -o /tmp/language_server "https://storage.googleapis.com/antigravity-public/antigravity-hub/2.33.0-4731201358004224/unsigned/language_server-linux-arm64"
-            echo "9772a2fd0d7654b317d439afec450a051018d0c69c9fb96e642a801846170fec  /tmp/language_server" | sha256sum -c -
+            echo "[CI] Downloading Antigravity v2.34.0 Linux ARM64 language_server..."
+            curl -fsSL -o /tmp/language_server "https://storage.googleapis.com/antigravity-public/antigravity-hub/2.34.0-5887025308631040/unsigned/language_server-linux-arm64"
+            echo "384fd3a5a467a136c44cd32d148ec75cd165ca6fbcb8aa57166cf7c7e59421d2  /tmp/language_server" | sha256sum -c -
             chmod 0755 /tmp/language_server
             tar -C /tmp -czf modules/core/pristine/language_server.tar.gz language_server
             rm -f /tmp/language_server
@@ -165,7 +165,9 @@ jobs:
 
             ### Highlights
 
-            - **Core v2.33.0 (Linux ARM64 Port):** Runs `language_server` natively in Android Bionic userspace with `wsTransport=3` WebSocket multiplexing and automatic agent stream resync.
+            - **Core v2.34.0 (Linux ARM64 Port):** Runs `language_server` natively in Android Bionic userspace with `wsTransport=3` WebSocket multiplexing and automatic agent stream resync.
+            - **Skills & Plugins Catalogue:** Browse and one-tap install 10 plugins (`rtk`, `antislop`, `superpowers`, `impeccable`, `context-mode`, `agents-suite`, `planning-with-files`, `sepia`, `gemini-agent-skills`, `antigravity-skills-manager`) and 23 skills directly under Settings → Customizations.
+            - **Persistent Service Control:** Non-dismissible status bar notification while active with a direct **Stop** button for clean shutdown of core, gateway, and background daemon.
             - **Multi-Provider AI Gateway (BYOK):** Configure **Google Gemini**, **OpenAI**, **Anthropic Claude** (including custom Anthropic endpoints), **OpenRouter**, **Groq**, **DeepSeek**, or custom OpenAI-compatible servers.
             - **Voice Mode & AudioWorklet:** Real-time `SpeechRecognizer`, `RecognizerIntent` fallback, 16 kHz PCM WebAudio capture with AudioWorklet CSP support, cloud Whisper/Gemini transcription, and native TTS.
             - **Built-in Web Terminal & PTY Support:** Native shell execution (`$PREFIX/bin/bash` -> `runtime/bin/bash` -> `/system/bin/sh`) with `xterm-256color` terminfo.

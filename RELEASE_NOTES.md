@@ -1,5 +1,17 @@
 # Release Notes — Antigravity for Android (ARM64)
 
+## v2.34.0
+
+### Core Runtime & Web Sync
+- **Upstream Antigravity v2.34.0 (Linux ARM64):** Synced the native Linux AArch64 `language_server` (`215,438,000` bytes, Go `go1.28-20261102-RC01`, upstream version `44.9.1`), updated web bundle assets (`web/main.js`, `web/compiled_tailwind.css`, new file icons), and aligned CI release configuration.
+- **Updated Binary & Web Patchers:** Updated `crash_suppressor.py` (masked `adrp`/`ldr` and `adrp`/`add` matching inside `PT_LOAD` `PF_X`), `nosandbox.py` (added v2.34.0 `exebox.newBox` and `isSandboxEnabled` signatures alongside v2.33.0), and `web/patch_main.py` (localized anchor searches and generalized minified identifiers).
+
+### Notification & Lifecycle Control
+- **Persistent Notification with Stop Action:** Added a **Stop** action (`ic_notification_stop` -> `CoreServerService.ACTION_STOP_APP`) to `ForegroundNotification`, pinned with `FLAG_ONGOING_EVENT | FLAG_NO_CLEAR` + `FOREGROUND_SERVICE_IMMEDIATE` and guarded via `ACTION_REPOST_NOTIFICATION` so it cannot be swiped clear while active. Tapping **Stop** cleanly terminates the Activity, foreground notification, core server, HTTP gateway, wake locks, and `agy-daemon`.
+
+### Built-in Skills & Plugins Catalogue
+- **Skills & Plugins Catalogue (`10` Plugins, `23` Skills):** Added the Beta APK catalogue UI (`web/generated/patches/catalogue.js`) backed by `CatalogueManager` (`com.agy.plugins`) and `AndroidBridge` (`listInstalledCatalogue`, `installCatalogueItem`, `uninstallCatalogueItem`, `restartCoreForCatalogue`) supporting built-in skill installation, safe GitHub archive extraction, and RTK binary setup.
+
 ## v2.33.0
 
 ### Core Runtime & Streaming

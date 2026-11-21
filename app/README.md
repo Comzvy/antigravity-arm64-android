@@ -71,8 +71,9 @@ graph TD
 
 Ядро системы (`language_server`) компилируется под Linux/Glibc и выполняется в окружении Android через кастомный загрузчик `libloader.so` с эмуляцией инструкций LSE (`liblse_compat.so`).
 
-- **`CoreServerService`**: 
-  - Запускается как `ForegroundService` с типом `dataSync` и иконкой в трее (`ForegroundNotification`).
+- **`CoreServerService` и `ForegroundNotification`**: 
+  - Запускается как `ForegroundService` с типом `dataSync` и несмахиваемой иконкой в трее (`ForegroundNotification` с `FLAG_ONGOING_EVENT | FLAG_NO_CLEAR`, `FOREGROUND_SERVICE_IMMEDIATE` и защитным `deleteIntent` -> `ACTION_REPOST_NOTIFICATION`).
+  - Предоставляет кнопку **Stop** (`ic_notification_stop` -> `ACTION_STOP_APP`) в статус-баре, которая через `handleStopApp()` и `cleanupCoreResources()` штатно завершает `MainActivity` (`finishAndRemoveTaskSafely()`), удаляет уведомление, останавливает супервизор ядра, HTTP Gateway, Wake/Wi-Fi Locks и фонового демона `agy-daemon`.
   - Удерживает CPU WakeLock (`PARTIAL_WAKE_LOCK`) и высокопроизводительный Wi-Fi Lock (`WIFI_MODE_FULL_HIGH_PERF`) через `WakeLockHolder`, гарантируя непрерывную вычислительную и сетевую работу агента в фоновом режиме и при заблокированном экране.
   - Управляет жизненным циклом супервизора ядра, HTTP Gateway и фонового демона `agy-daemon`.
 - **`BatteryOptimization`**:
@@ -140,7 +141,8 @@ graph TD
 
 Класс `AndroidBridge` предоставляет минимальный, жестко изолированный интерфейс для фронтенда (`@JavascriptInterface`).
 
-- **Защита от сторонних фреймов:** Привилегированные операции (`onUiReady`, `onUiError`, `saveBlob`, `getAiConfig`, `saveAiConfig`, `fetchAiModels`, `checkEngineReady`, `startVoiceRecognition`, `stopVoiceRecognition`, `cancelVoiceRecognition`, `transcribeAudio`, `speakText`, `stopSpeaking`) требуют передачи криптографического токена `blobBridgeToken`, известного только доверенному верхнеуровневому документу. Сравнение токенов производится через `MessageDigest.isEqual` во избежание timing-атак.
+- **Защита от сторонних фреймов:** Привилегированные операции (`onUiReady`, `onUiError`, `saveBlob`, `getAiConfig`, `saveAiConfig`, `fetchAiModels`, `checkEngineReady`, `startVoiceRecognition`, `stopVoiceRecognition`, `cancelVoiceRecognition`, `transcribeAudio`, `speakText`, `stopSpeaking`, `listInstalledCatalogue`, `installCatalogueItem`, `uninstallCatalogueItem`, `restartCoreForCatalogue`) требуют передачи криптографического токена `blobBridgeToken`, известного только доверенному верхнеуровневому документу. Сравнение токенов производится через `MessageDigest.isEqual` во избежание timing-атак.
+- **Каталог навыков и плагинов (`com.agy.plugins.CatalogueManager`):** Управляет установкой, проверкой статуса и удалением встроенных навыков, архивов GitHub и бинарника RTK (`aarch64-unknown-linux-musl`) через безопасную распаковку без обхода директорий (`PathSafety`), с вызовом методов моста `listInstalledCatalogue`, `installCatalogueItem`, `uninstallCatalogueItem` и `restartCoreForCatalogue`.
 - **Тактильная отдача и системная навигация назад (`performHapticFeedback`, `showToast`, `BackNavigator`):**
   - `performHapticFeedback(type)` и `showToast(message)` обеспечивают нативный тактильный отклик (`HapticFeedbackConstants.KEYBOARD_TAP` / `LONG_PRESS` / `VIRTUAL_KEY`) и системные уведомления при взаимодействии с элементами UI.
   - `BackNavigator.handle()` при нажатии системной кнопки/жеста «Назад» сначала вызывает `window.__agHandleAndroidBack()` для закрытия открытых модальных окон/оверлеев/панели клавиш в WebView, затем проверяет историю `webView.canGoBack()`, и требует двойного нажатия в течение 2 секунд перед сворачиванием приложения (`moveTaskToBack(true)`).

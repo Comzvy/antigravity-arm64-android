@@ -167,11 +167,22 @@ function isEditableInputTarget(el) {
 function installAndroidBackHandler(global, doc) {
   global.__agHandleAndroidBack = function () {
     try {
-      // 1. Close AI Models modal if open
+      // 1. Close Skills & Plugins Catalogue or AI Models modal if open
+      var catBackdrop = doc.querySelector('.agy-cat-backdrop');
+      if (catBackdrop) {
+        if (global.__agCatalogue && typeof global.__agCatalogue.closeModal === 'function') {
+          global.__agCatalogue.closeModal();
+          return true;
+        }
+        catBackdrop.remove();
+        return true;
+      }
+
       var aiBackdrop = doc.querySelector('.agy-ai-backdrop');
       if (aiBackdrop) {
-        if (global.__agAiModelsMenu && typeof global.__agAiModelsMenu.closeModal === 'function') {
-          global.__agAiModelsMenu.closeModal();
+        var aiApi = global.__agAiModels || global.__agAiModelsMenu;
+        if (aiApi && typeof aiApi.closeModal === 'function') {
+          aiApi.closeModal();
           return true;
         }
         aiBackdrop.remove();

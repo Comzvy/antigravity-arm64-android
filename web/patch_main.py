@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-web/patch_main.py - Dynamic patcher for web/main.js (supports v2.33.0 and v2.11.0).
+web/patch_main.py - Dynamic patcher for web/main.js (supports v2.34.0, v2.33.0, and v2.11.0).
 
 Locates the Appearance settings block and injects the Desktop Mode toggle,
 AI Models & API Keys button, Android Voice-to-Text (__agVoiceBridge) hooks,
@@ -21,22 +21,24 @@ def patch_appearance(content):
         print("[web-patch] Desktop Mode & AI Models toggle already present in main.js")
         return content, False
 
-    # v2.11.0 hook pattern or v2.33.0 pre-return hook point inside AppearanceSettings
+    # Localize searches around {label:"Theme" to avoid scanning the full bundle with backtracking regexes
     hook_pattern_v211 = re.compile(
-        r'(var\s+[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==3,\s*[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==2,\s*[A-Za-z0-9_$]+=[A-Za-z0-9_$]+=>\s*[A-Za-z0-9_$]+=>\{.*?\};)'
+        r'(var\s+[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==3,\s*[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==2,\s*[A-Za-z0-9_$]+=[A-Za-z0-9_$]+=>\s*[A-Za-z0-9_$]+=>\{[^}]{0,400}\};)'
     )
     hook_pattern_v233 = re.compile(
         r'([A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==3;var\s+[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==2;)(?=return\s+[A-Za-z0-9_$]+\.createElement\([^,]+,null,[A-Za-z0-9_$]+\.createElement\([^,]+,\{title:"Appearance"\})'
     )
-    hook_match = hook_pattern_v211.search(content) or hook_pattern_v233.search(content)
 
     theme_idx = content.find('{label:"Theme"')
+    hook_match = None
     theme_match = None
     react_id = "D"
+    win_start = 0
     if theme_idx != -1:
-        window_start = max(0, theme_idx - 100)
-        window_end = min(len(content), theme_idx + 500)
-        window_text = content[window_start:window_end]
+        win_start = max(0, theme_idx - 600)
+        win_end = min(len(content), theme_idx + 500)
+        window_text = content[win_start:win_end]
+        hook_match = hook_pattern_v233.search(window_text) or hook_pattern_v211.search(window_text)
         theme_pattern = re.compile(
             r'([A-Za-z0-9_$]+)\.createElement\(([A-Za-z0-9_$]+),\{label:"Theme",.*?onSelect:[A-Za-z0-9_$]+\}\)'
         )
@@ -84,7 +86,9 @@ def patch_appearance(content):
         + f'className:"px-3 py-1 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 cursor-pointer"}},"Manage Keys")}})'
     )
 
-    content = content.replace(orig_hook, injected_hook, 1)
+    hook_abs_start = win_start + hook_match.start(1)
+    hook_abs_end = win_start + hook_match.end(1)
+    content = content[:hook_abs_start] + injected_hook + content[hook_abs_end:]
     content = content.replace(orig_theme, injected_theme, 1)
     print(f"[web-patch] Successfully patched Desktop Mode & AI Models into main.js (react={react_id}, item={item_comp}, switch={switch_comp})")
     return content, True
@@ -221,9 +225,9 @@ def patch_mcp_plugins_fallback(content):
         return content, False
 
     plug_re = re.compile(
-        r'getAvailableCascadePlugins:async\s+([A-Za-z0-9_$]+)=>f\(([A-Za-z0-9_$]+)=>\2\.getAvailableCascadePlugins\(([A-Za-z0-9_$]+)\(([A-Za-z0-9_$]+),\1\)\)\),'
-        r'getBuildWithGooglePlugins:async\(\)=>f\(([A-Za-z0-9_$]+)=>\5\.getBuildWithGooglePlugins\(\3\(([A-Za-z0-9_$]+),\{\}\)\)\),'
-        r'downloadBuildWithGooglePlugin:async\s+([A-Za-z0-9_$]+)=>f\(async\s+([A-Za-z0-9_$]+)=>\{var\s+([A-Za-z0-9_$]+)=\3\(([A-Za-z0-9_$]+)\);\9\.pluginId=\7\.uid;return\s+\8\.downloadBuildWithGooglePlugin\(\9\)\}\),'
+        r'getAvailableCascadePlugins:async\s+([A-Za-z0-9_$]+)=>f\(([A-Za-z0-9_$]+)=>\2\.getAvailableCascadePlugins\(([A-Za-z0-9_$]+)\(([A-Za-z0-9_$]+),\1\)\)\),\s*'
+        r'getBuildWithGooglePlugins:async\(\)=>f\(([A-Za-z0-9_$]+)=>\5\.getBuildWithGooglePlugins\(\3\(([A-Za-z0-9_$]+),\{\}\)\)\),\s*'
+        r'downloadBuildWithGooglePlugin:async\s+([A-Za-z0-9_$]+)=>f\(async\s+([A-Za-z0-9_$]+)=>\{var\s+([A-Za-z0-9_$]+)=\3\(([A-Za-z0-9_$]+)\);\9\.pluginId=\7\.uid;return\s+\8\.downloadBuildWithGooglePlugin\(\9\)\}\),\s*'
         r'deletePlugin:async\s+([A-Za-z0-9_$]+)=>f\(async\s+([A-Za-z0-9_$]+)=>\{var\s+([A-Za-z0-9_$]+)=\3\(([A-Za-z0-9_$]+)\);\s*\13\.pluginId=\11\.pluginId;return\s+\12\.deletePlugin\(\13\)\}\)'
     )
     m = plug_re.search(content)
@@ -252,44 +256,54 @@ def patch_voice_mode_worklet(content):
     modified = False
 
     # 1. Load ./audio_processor.js ('self') with Blob/data fallback instead of bare data: URL
-    worklet_re = re.compile(
-        r'([A-Za-z0-9_$]+)\.audioWorklet\.addModule\("data:application/javascript;base64,"\+btoa\(([A-Za-z0-9_$]+)\)\)'
-    )
-    m_w = worklet_re.search(content)
-    if m_w:
-        ctx_var, src_var = m_w.groups()
-        repl = (
-            f'(/*__agVoiceMicWorkletPatch*/async()=>{{'
-            f'try{{return await {ctx_var}.audioWorklet.addModule("./audio_processor.js")}}catch(_a){{'
-            f'try{{var _b=URL.createObjectURL(new Blob([{src_var}],{{type:"application/javascript"}}));'
-            f'try{{return await {ctx_var}.audioWorklet.addModule(_b)}}finally{{URL.revokeObjectURL(_b)}}}}'
-            f'catch(_c){{return {ctx_var}.audioWorklet.addModule("data:application/javascript;base64,"+btoa({src_var}))}}'
-            f'}}}})()'
+    w_anchor = content.find('.audioWorklet.addModule("data:application/javascript;base64,"+btoa(')
+    if w_anchor != -1:
+        w_start = max(0, w_anchor - 40)
+        w_end = min(len(content), w_anchor + 160)
+        w_win = content[w_start:w_end]
+        worklet_re = re.compile(
+            r'([A-Za-z0-9_$]+)\.audioWorklet\.addModule\("data:application/javascript;base64,"\+btoa\(([A-Za-z0-9_$]+)\)\)'
         )
-        content = content[:m_w.start()] + repl + content[m_w.end():]
-        modified = True
+        m_w = worklet_re.search(w_win)
+        if m_w:
+            ctx_var, src_var = m_w.groups()
+            repl = (
+                f'(/*__agVoiceMicWorkletPatch*/async()=>{{'
+                f'try{{return await {ctx_var}.audioWorklet.addModule("./audio_processor.js")}}catch(_a){{'
+                f'try{{var _b=URL.createObjectURL(new Blob([{src_var}],{{type:"application/javascript"}}));'
+                f'try{{return await {ctx_var}.audioWorklet.addModule(_b)}}finally{{URL.revokeObjectURL(_b)}}}}'
+                f'catch(_c){{return {ctx_var}.audioWorklet.addModule("data:application/javascript;base64,"+btoa({src_var}))}}'
+                f'}}}})()'
+            )
+            content = content[:w_start + m_w.start()] + repl + content[w_start + m_w.end():]
+            modified = True
 
     # 2. Release any native SpeechRecognizer hold and retry getUserMedia with simpler constraints
-    gum_re = re.compile(
-        r'(async function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\)\{var ([A-Za-z0-9_$]+)=[A-Za-z0-9_$]+,([A-Za-z0-9_$]+)=[A-Za-z0-9_$]+;try\{)'
-        r'(let ([A-Za-z0-9_$]+)=[A-Za-z0-9_$]+\(\3\);)'
-        r'if\(!\8\)return navigator\.mediaDevices\.getUserMedia\(\{audio:\2\}\);'
-    )
-    m_g = gum_re.search(content)
-    if m_g:
-        hdr, a_arg, _b_arg, c_arg, d_var, f_var, let_g, g_var = m_g.groups()
-        repl = (
-            f'{hdr}try{{window.Android?.cancelVoiceRecognition?.(window.__AG_NATIVE_BRIDGE_TOKEN__||"","")}}catch(_){{}}'
-            f'{let_g}if(!{g_var}){{'
-            f'try{{return {f_var}(await {d_var}(navigator.mediaDevices.getUserMedia({{audio:{a_arg}}})))}}catch(_e1){{'
-            f'{f_var}();var _n1=_e1?.name;if({c_arg}?.()||_n1==="NotAllowedError"||_n1==="SecurityError")throw _e1;'
-            f'{f_var}(await {d_var}(new Promise(_r=>{{window.setTimeout(_r,150)}})));if({c_arg}?.())throw _e1;'
-            f'try{{return {f_var}(await {d_var}(navigator.mediaDevices.getUserMedia({{audio:{{echoCancellation:!0,noiseSuppression:!0}}}})))}}catch(_e2){{'
-            f'{f_var}();var _n2=_e2?.name;if({c_arg}?.()||_n2==="NotAllowedError"||_n2==="SecurityError")throw _e2;'
-            f'return navigator.mediaDevices.getUserMedia({{audio:!0}})}}}}}}'
+    g_anchor = content.find('return navigator.mediaDevices.getUserMedia({audio:')
+    if g_anchor != -1:
+        g_start = max(0, g_anchor - 220)
+        g_end = min(len(content), g_anchor + 80)
+        g_win = content[g_start:g_end]
+        gum_re = re.compile(
+            r'(async function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\)\{var ([A-Za-z0-9_$]+)=[A-Za-z0-9_$]+,([A-Za-z0-9_$]+)=[A-Za-z0-9_$]+;try\{)'
+            r'(let ([A-Za-z0-9_$]+)=[A-Za-z0-9_$]+\(\3\);)'
+            r'if\(!\8\)return navigator\.mediaDevices\.getUserMedia\(\{audio:\2\}\);'
         )
-        content = content[:m_g.start()] + repl + content[m_g.end():]
-        modified = True
+        m_g = gum_re.search(g_win)
+        if m_g:
+            hdr, a_arg, _b_arg, c_arg, d_var, f_var, let_g, g_var = m_g.groups()
+            repl = (
+                f'{hdr}try{{window.Android?.cancelVoiceRecognition?.(window.__AG_NATIVE_BRIDGE_TOKEN__||"","")}}catch(_){{}}'
+                f'{let_g}if(!{g_var}){{'
+                f'try{{return {f_var}(await {d_var}(navigator.mediaDevices.getUserMedia({{audio:{a_arg}}})))}}catch(_e1){{'
+                f'{f_var}();var _n1=_e1?.name;if({c_arg}?.()||_n1==="NotAllowedError"||_n1==="SecurityError")throw _e1;'
+                f'{f_var}(await {d_var}(new Promise(_r=>{{window.setTimeout(_r,150)}})));if({c_arg}?.())throw _e1;'
+                f'try{{return {f_var}(await {d_var}(navigator.mediaDevices.getUserMedia({{audio:{{echoCancellation:!0,noiseSuppression:!0}}}})))}}catch(_e2){{'
+                f'{f_var}();var _n2=_e2?.name;if({c_arg}?.()||_n2==="NotAllowedError"||_n2==="SecurityError")throw _e2;'
+                f'return navigator.mediaDevices.getUserMedia({{audio:!0}})}}}}}}'
+            )
+            content = content[:g_start + m_g.start()] + repl + content[g_start + m_g.end():]
+            modified = True
 
     if modified:
         print("[web-patch] Successfully patched Voice Mode AudioWorklet & mic fallback into main.js")
@@ -307,74 +321,99 @@ def patch_remote_projects_startup(content):
     modified = False
 
     # 1. Default enable-remote-ai, enable-github-decorator, enable-voice-relay, enable-audio-transcription in Ui()
-    ui_re = re.compile(
-        r'(function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\)\{)return\(\2=\2\.experiments\[\3\]\)\?!\2\.disabled:!1\}'
-    )
-    m_ui = ui_re.search(content)
-    if m_ui:
-        hdr, a_var, b_var = m_ui.groups()
-        repl = (
-            f'{hdr}/*__agRemoteStartupPatch*/var _x={a_var}.experiments[{b_var}];return _x?!_x.disabled:'
-            f'({b_var}==="enable-audio-transcription"||{b_var}==="enable-remote-ai"||{b_var}==="enable-github-decorator"||{b_var}==="enable-voice-relay")}}'
+    ui_anchor = content.find('.experiments[')
+    if ui_anchor != -1:
+        ui_start = max(0, ui_anchor - 80)
+        ui_end = min(len(content), ui_anchor + 80)
+        ui_win = content[ui_start:ui_end]
+        ui_re = re.compile(
+            r'(function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\)\{)return\(\2=\2\.experiments\[\3\]\)\?!\2\.disabled:!1\}'
         )
-        content = content[:m_ui.start()] + repl + content[m_ui.end():]
-        modified = True
+        m_ui = ui_re.search(ui_win)
+        if m_ui:
+            hdr, a_var, b_var = m_ui.groups()
+            repl = (
+                f'{hdr}/*__agRemoteStartupPatch*/var _x={a_var}.experiments[{b_var}];return _x?!_x.disabled:'
+                f'({b_var}==="enable-audio-transcription"||{b_var}==="enable-remote-ai"||{b_var}==="enable-github-decorator"||{b_var}==="enable-voice-relay")}}'
+            )
+            content = content[:ui_start + m_ui.start()] + repl + content[ui_start + m_ui.end():]
+            modified = True
 
     # 2. Include those default-enabled flags in $la() before Mendel finishes warming up
-    all_flags_re = re.compile(
-        r'(function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+)\)\{var ([A-Za-z0-9_$]+)=\2\.experiments;)return Object\.keys\(\3\)\.filter\(([A-Za-z0-9_$]+)=>!\3\[\4\]\?\.disabled\)\}'
-    )
-    m_af = all_flags_re.search(content)
-    if m_af:
-        hdr, _a_var, b_var, c_var = m_af.groups()
-        repl = (
-            f'{hdr}var _k=Object.keys({b_var}).filter({c_var}=>!{b_var}[{c_var}]?.disabled);'
-            f'for(var _f of["enable-audio-transcription","enable-remote-ai","enable-github-decorator","enable-voice-relay"])'
-            f'!{b_var}[_f]&&!_k.includes(_f)&&_k.push(_f);return _k}}'
+    af_anchor = content.find('.experiments;return Object.keys(')
+    if af_anchor != -1:
+        af_start = max(0, af_anchor - 80)
+        af_end = min(len(content), af_anchor + 120)
+        af_win = content[af_start:af_end]
+        all_flags_re = re.compile(
+            r'(function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+)\)\{var ([A-Za-z0-9_$]+)=\2\.experiments;)return Object\.keys\(\3\)\.filter\(([A-Za-z0-9_$]+)=>!\3\[\4\]\?\.disabled\)\}'
         )
-        content = content[:m_af.start()] + repl + content[m_af.end():]
-        modified = True
+        m_af = all_flags_re.search(af_win)
+        if m_af:
+            hdr, _a_var, b_var, c_var = m_af.groups()
+            repl = (
+                f'{hdr}var _k=Object.keys({b_var}).filter({c_var}=>!{b_var}[{c_var}]?.disabled);'
+                f'for(var _f of["enable-audio-transcription","enable-remote-ai","enable-github-decorator","enable-voice-relay"])'
+                f'!{b_var}[_f]&&!_k.includes(_f)&&_k.push(_f);return _k}}'
+            )
+            content = content[:af_start + m_af.start()] + repl + content[af_start + m_af.end():]
+            modified = True
 
     # 3. Retry GetMendelFlags quickly when initial call returns {} during server startup refresh
-    mendel_retry_re = re.compile(
-        r'(async function ([A-Za-z0-9_$]+)\(([A-Za-z0-9_$]+)\)\{[^}]{0,260}?if\(([A-Za-z0-9_$]+)!==void 0\)\{var [A-Za-z0-9_$]+=\3\.loaded;\3\.loaded=!0;\3\.flagOverrideSync\.retry\(\);[A-Za-z0-9_$]+&&[A-Za-z0-9_$]+\(\3\.experiments,\4\)\|\|\3\.stateProvider\.setState\(\4\))(\}\})'
-    )
-    m_mr = mendel_retry_re.search(content)
-    if m_mr:
-        hdr, xla_fn, a_var, f_var, tail = m_mr.groups()
-        repl = (
-            f'{hdr};Object.keys({f_var}).length===0&&!{a_var}.__agMendelRetried&&'
-            f'({a_var}.__agMendelRetried=!0,setTimeout(()=>{{{xla_fn}({a_var})}},1500),setTimeout(()=>{{{xla_fn}({a_var})}},3500)){tail}'
+    mr_anchor = content.find('flagOverrideSync.retry()')
+    if mr_anchor != -1:
+        mr_start = max(0, mr_anchor - 260)
+        mr_end = min(len(content), mr_anchor + 200)
+        mr_win = content[mr_start:mr_end]
+        mendel_retry_re = re.compile(
+            r'(async function ([A-Za-z0-9_$]+)\(([A-Za-z0-9_$]+)\)\{[^}]{0,260}?if\(([A-Za-z0-9_$]+)!==void 0\)\{var [A-Za-z0-9_$]+=\3\.loaded;\3\.loaded=!0;\3\.flagOverrideSync\.retry\(\);[A-Za-z0-9_$]+&&[A-Za-z0-9_$]+\(\3\.experiments,\4\)\|\|\3\.stateProvider\.setState\(\4\))(\}(?:\}(?:finally\{[A-Za-z0-9_$]+\(\)\})?\})?)'
         )
-        content = content[:m_mr.start()] + repl + content[m_mr.end():]
-        modified = True
+        m_mr = mendel_retry_re.search(mr_win)
+        if m_mr:
+            hdr, xla_fn, a_var, f_var, tail = m_mr.groups()
+            repl = (
+                f'{hdr};Object.keys({f_var}).length===0&&!{a_var}.__agMendelRetried&&'
+                f'({a_var}.__agMendelRetried=!0,setTimeout(()=>{{{xla_fn}({a_var})}},1500),setTimeout(()=>{{{xla_fn}({a_var})}},3500)){tail}'
+            )
+            content = content[:mr_start + m_mr.start()] + repl + content[mr_start + m_mr.end():]
+            modified = True
 
-    # 4. Poll listProjects({backend:2}) on cloud startup in yld() until server finishes auth/state refresh
-    cloud_stream_re = re.compile(
-        r'(function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\)\{)(Li\(\{abort:\3,createStream:[A-Za-z0-9_$]+=>\2\.lsClient\.projectUpdatesStream\(\{backend:2\},\{signal:[A-Za-z0-9_$]+\}\),onMessage:[A-Za-z0-9_$]+=>\{[A-Za-z0-9_$]+\.update\.case==="projectList"\?\(\2\.cloudProjectIds=[A-Za-z0-9_$]+\.update\.value\.projectIds,([A-Za-z0-9_$]+)\(\2\)\):[A-Za-z0-9_$]+\.update\.case==="projectUpdatedId"&&[A-Za-z0-9_$]+\(\2,[A-Za-z0-9_$]+\.update\.value\)\},onError:[A-Za-z0-9_$]+=>\{console\.warn\("\[ProjectUpdates\] Cloud stream error:",[A-Za-z0-9_$]+\)\},onDisconnect:\(\)=>\{console\.warn\("\[ProjectUpdates\] Cloud disconnected"\)\}\}\))(\})'
-    )
-    m_cs = cloud_stream_re.search(content)
-    if m_cs:
-        hdr, a_var, b_var, body, u7_fn, tail = m_cs.groups()
-        repl = (
-            f'{hdr}{body};(async()=>{{for(var _i=0;_i<5&&!{b_var}.signal.aborted;_i++){{'
-            f'try{{var _r=await {a_var}.lsClient.listProjects({{backend:2}},{{signal:{b_var}.signal}});'
-            f'if({b_var}.signal.aborted)break;if(_r?.projectIds?.length>0){{'
-            f'if(JSON.stringify(_r.projectIds)!==JSON.stringify({a_var}.cloudProjectIds)){{{a_var}.cloudProjectIds=_r.projectIds;{u7_fn}({a_var})}}break}}}}catch(_){{}}'
-            f'await new Promise(_w=>setTimeout(_w,1200))}}}})(){tail}'
+    # 4. Poll listProjects({backend:2}) on cloud startup until server finishes auth/state refresh
+    cs_anchor = content.find('projectUpdatesStream({backend:2}')
+    if cs_anchor != -1:
+        cs_start = max(0, cs_anchor - 120)
+        cs_end = min(len(content), cs_anchor + 480)
+        cs_win = content[cs_start:cs_end]
+        cloud_stream_re = re.compile(
+            r'(function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\)\{)([A-Za-z0-9_$]+\(\{abort:\3,createStream:[A-Za-z0-9_$]+=>\2\.lsClient\.projectUpdatesStream\(\{backend:2\},\{signal:[A-Za-z0-9_$]+\}\),onMessage:[A-Za-z0-9_$]+=>\{[A-Za-z0-9_$]+\.update\.case==="projectList"\?\(\2\.cloudProjectIds=[A-Za-z0-9_$]+\.update\.value\.projectIds,([A-Za-z0-9_$]+)\(\2\)\):[A-Za-z0-9_$]+\.update\.case==="projectUpdatedId"&&[A-Za-z0-9_$]+\(\2,[A-Za-z0-9_$]+\.update\.value\)\},onError:[A-Za-z0-9_$]+=>\{console\.warn\("\[ProjectUpdates\] Cloud stream error:",[A-Za-z0-9_$]+\)\},onDisconnect:\(\)=>\{console\.warn\("\[ProjectUpdates\] Cloud disconnected"\)\}\}\))(\})'
         )
-        content = content[:m_cs.start()] + repl + content[m_cs.end():]
-        modified = True
+        m_cs = cloud_stream_re.search(cs_win)
+        if m_cs:
+            hdr, a_var, b_var, body, u7_fn, tail = m_cs.groups()
+            repl = (
+                f'{hdr}{body};(async()=>{{for(var _i=0;_i<5&&!{b_var}.signal.aborted;_i++){{'
+                f'try{{var _r=await {a_var}.lsClient.listProjects({{backend:2}},{{signal:{b_var}.signal}});'
+                f'if({b_var}.signal.aborted)break;if(_r?.projectIds?.length>0){{'
+                f'if(JSON.stringify(_r.projectIds)!==JSON.stringify({a_var}.cloudProjectIds)){{{a_var}.cloudProjectIds=_r.projectIds;{u7_fn}({a_var})}}break}}}}catch(_){{}}'
+                f'await new Promise(_w=>setTimeout(_w,1200))}}}})(){tail}'
+            )
+            content = content[:cs_start + m_cs.start()] + repl + content[cs_start + m_cs.end():]
+            modified = True
 
     # 5. Allow retrying GitHub repository fetch after transient startup errors
-    gh_repo_re = re.compile(
-        r'(([A-Za-z0-9_$]+)\("github/repo"\)\.then\([A-Za-z0-9_$]+=>\{([A-Za-z0-9_$]+)\.current=!0;[^}]+\}\)\.catch\(\(\)=>\{)\3\.current=!0;'
-    )
-    m_gh = gh_repo_re.search(content)
-    if m_gh:
-        hdr, _fn_var, ref_var = m_gh.groups()
-        content = content[:m_gh.start()] + f'{hdr}{ref_var}.current=!1;' + content[m_gh.end():]
-        modified = True
+    gh_anchor = content.find('("github/repo").then(')
+    if gh_anchor != -1:
+        gh_start = max(0, gh_anchor - 40)
+        gh_end = min(len(content), gh_anchor + 180)
+        gh_win = content[gh_start:gh_end]
+        gh_repo_re = re.compile(
+            r'(([A-Za-z0-9_$]+)\("github/repo"\)\.then\([A-Za-z0-9_$]+=>\{([A-Za-z0-9_$]+)\.current=!0;[^}]+\}\)\.catch\(\(\)=>\{)\3\.current=!0;'
+        )
+        m_gh = gh_repo_re.search(gh_win)
+        if m_gh:
+            hdr, _fn_var, ref_var = m_gh.groups()
+            content = content[:gh_start + m_gh.start()] + f'{hdr}{ref_var}.current=!1;' + content[gh_start + m_gh.end():]
+            modified = True
 
     if modified:
         print("[web-patch] Successfully patched remote projects startup in main.js")
@@ -400,9 +439,9 @@ def patch_agent_stream_resync(content):
 
     kda_re = re.compile(
         r'(async function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\)\{'
-        r'var ([A-Za-z0-9_$]+)=e,([A-Za-z0-9_$]+)=e;try\{let \{initialStepsSlice:[^}]+\}=[^,]+,([A-Za-z0-9_$]+)=Af\(\3\),[A-Za-z0-9_$]+=[A-Za-z0-9_$]+,[A-Za-z0-9_$]+=0;'
-        r'for\(;!\5\.signal\.aborted;\)\{if\([A-Za-z0-9_$]+\)\{[^}]+\}let [A-Za-z0-9_$]+=Jf\(\);[A-Za-z0-9_$]+\?\.\([A-Za-z0-9_$]+\);)'
-        r'(try\{let ([A-Za-z0-9_$]+)=cc\([^.]+\.StreamAgentStateUpdatesRequestSchema,\{[^}]+\}\)),([A-Za-z0-9_$]+)=\2\(\11,\{signal:\5\.signal\}\);(for await\(let [A-Za-z0-9_$]+ of \7\(\12\)\)\{\8\(\);try\{)'
+        r'var ([A-Za-z0-9_$]+)=e,([A-Za-z0-9_$]+)=e;try\{let \{initialStepsSlice:[^}]+\}=[^,]+,([A-Za-z0-9_$]+)=[A-Za-z0-9_$]+\(\3\),[A-Za-z0-9_$]+=[A-Za-z0-9_$]+,[A-Za-z0-9_$]+=0;'
+        r'for\(;!\5\.signal\.aborted;\)\{if\([A-Za-z0-9_$]+\)\{[^}]+\}let [A-Za-z0-9_$]+=[A-Za-z0-9_$]+\(\);[A-Za-z0-9_$]+\?\.\([A-Za-z0-9_$]+\);)'
+        r'(try\{let ([A-Za-z0-9_$]+)=[A-Za-z0-9_$]+\([^.]+\.StreamAgentStateUpdatesRequestSchema,\{[^}]+\}\)),([A-Za-z0-9_$]+)=\2\(\11,\{signal:\5\.signal\}\);(for await\(let [A-Za-z0-9_$]+ of \7\(\12\)\)\{\8\(\);try\{)'
         r'(.*?\[consumeAgentStateStream\] streamAgentStateUpdates error:.*?if\(!([A-Za-z0-9_$]+)\)break\})'
         r'\5\.signal\.aborted\|\|\8\(await \7\(new Promise\(([A-Za-z0-9_$]+)=>setTimeout\(\16,1E3\)\)\)\);',
         re.DOTALL,

@@ -81,6 +81,9 @@ web/
 │       ├── web_optimizations.js
 │       ├── touch_model_menu.js
 │       ├── theme_sync.js
+│       ├── ai_models_menu.js
+│       ├── catalogue.js
+│       ├── voice_input.js
 │       └── startup_ready.js
 ├── src/                          # Модульные исходники фрагментов бандлов
 │   ├── boot/                     # Фрагменты раннего старта
@@ -113,9 +116,10 @@ web/
 | **`patches/touch_model_menu.js`** | IIFE | ~6.7 KB | Адаптация hover-меню выбора моделей Base UI под сенсорный ввод. |
 | **`patches/theme_sync.js`** | IIFE | ~4.7 KB | MutationObserver за классами `<html>`/`<body>` и передача смены темы в нативный Android. |
 | **`patches/ai_models_menu.js`** | IIFE | ~55 KB | Модальное меню и встроенные карточки управления провайдерами ИИ, API-ключами, кастомными эндпоинтами Anthropic (`/v1/messages`) / OpenAI / Gemini, кастомными HTTP-заголовками и каталогом моделей (BYOK). |
+| **`patches/catalogue.js`** | IIFE | — | Встроенный каталог навыков и плагинов (`10` плагинов, `23` навыка из Beta APK) в интерфейсе настроек Customizations / Plugins с поддержкой установки/удаления и перезапуска ядра. |
 | **`patches/voice_input.js`** | IIFE | ~19 KB | Мост голосового ввода (`window.__agVoiceBridge`), потоковая транскрипция речи Android `SpeechRecognizer` + WebAudio/Whisper/Gemini фоллбэк и полифиллы `SpeechRecognition` / `speechSynthesis`. |
 | **`patches/startup_ready.js`** | IIFE | ~4.7 KB | Детектор первого полезного рендера DOM и перехватчик JS-ошибок для `AndroidBridge`. |
-| **`main.js`** | Raw + Patch | ~9.5 MB | Рабочий бандл React UI, пропатченный скриптом `patch_main.py`. |
+| **`main.js`** | Raw + Patch | ~12.6 MB | Рабочий бандл React UI (v2.34.0), пропатченный скриптом `patch_main.py` с локализованным поиском паттернов. |
 
 ### Проверка валидности (Verification)
 После сборки `build.sh` запускает статический синтаксический анализатор V8 (`node --check`) для каждого сгенерированного файла. Если Node.js не установлен в окружении, проверка пропускается с информационным предупреждением.
@@ -186,6 +190,10 @@ web/
 | `stopSpeaking` | `(token) => void` | Остановка активного озвучивания TTS. |
 | `openDirectoryPicker` | `() => void` | Запускает системный диалог выбора папки (SAF Document Tree) для открытия проекта. |
 | `saveBlob` | `(token, base64, filename, mime) => void` | Безопасное сохранение сгенерированных веб-интерфейсом блобов в хранилище `Downloads`. |
+| `listInstalledCatalogue` | `(token, callbackName) => void` | Асинхронно возвращает JSON установленных плагинов и навыков через callback-функцию окна. |
+| `installCatalogueItem` | `(token, itemJson, callbackName) => void` | Устанавливает плагин или навык из встроенного каталога / GitHub-архива / RTK через `CatalogueManager`. |
+| `uninstallCatalogueItem` | `(token, id, kind, callbackName) => void` | Удаляет ранее установленный плагин или навык каталога. |
+| `restartCoreForCatalogue` | `(token) => void` | Запрашивает мягкий перезапуск супервизора ядра после установки/удаления элементов каталога. |
 
 ---
 

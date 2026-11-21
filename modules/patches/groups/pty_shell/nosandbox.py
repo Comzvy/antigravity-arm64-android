@@ -12,29 +12,39 @@ This patch:
 """
 from typing import Tuple, Dict, Any, List, Union
 
-# 1. exebox.newBox (v2.33.0: 0x6139114 .. 0x613912c, 24 bytes):
+# 1. exebox.newBox:
 #    str x1, [sp, #128]; mov x1, #1; strb w1, [sp, #39];
 #    bl validateHostLoopbackPorts; cbnz x0, ...; ldr x0, [sp, #88]
 # -> str x1, [sp, #128]; mov x1, #1; strb w1, [sp, #39];
-#    ldr x2, [x0]; strb w1, [x2]; b 0x613916c (exebox.(*Box).init)
-EXEBOX_CLEAN = bytes.fromhex("e14300f9e10340b2e19f00396c030094800900b5e02f40f9")
-EXEBOX_PATCHED = bytes.fromhex("e14300f9e10340b2e19f0039020040f94100003911000014")
+#    ldr x2, [x0]; strb w1, [x2]; b <bl exebox.(*Box).init>
+# v2.34.0 (0x646c5c4..0x646c5dc -> b +0x70 to 0x646c648)
+EXEBOX_CLEAN_V234 = bytes.fromhex("e14300f9e10340b2e19f003904040094e00e00b5e02f40f9")
+EXEBOX_PATCHED_V234 = bytes.fromhex("e14300f9e10340b2e19f0039020040f9410000391c000014")
+# v2.33.0 (0x6139114..0x613912c -> b +0x44 to 0x613916c)
+EXEBOX_CLEAN_V233 = bytes.fromhex("e14300f9e10340b2e19f00396c030094800900b5e02f40f9")
+EXEBOX_PATCHED_V233 = bytes.fromhex("e14300f9e10340b2e19f0039020040f94100003911000014")
 
-# 2. RunCommandHandler.isSandboxEnabled epilogue (0x6a2c100 .. 0x6a2c120, 32 bytes):
-#    mov x0, x1 -> mov x0, xzr
-SANDBOX_ENABLED_CLEAN = bytes.fromhex(
+# 2. RunCommandHandler.isSandboxEnabled epilogue:
+#    force return value x0 = xzr (false)
+# v2.34.0 (0x81d8fd8..0x81d8ff0, leaf epilogue mov x0, x2; ret -> mov x0, xzr; ret)
+SANDBOX_ENABLED_CLEAN_V234 = bytes.fromhex("034840396300003641000037e2031faae00302aac0035fd6")
+SANDBOX_ENABLED_PATCHED_V234 = bytes.fromhex("034840396300003641000037e2031faae0031faac0035fd6")
+# v2.33.0 (0x8009e30..0x8009e50, framed epilogue mov x0, x1 -> mov x0, xzr)
+SANDBOX_ENABLED_CLEAN_V233 = bytes.fromhex(
     "034840396300003642000037e1031faae00301aafd835ff8fe0744f8c0035fd6"
 )
-SANDBOX_ENABLED_PATCHED = bytes.fromhex(
+SANDBOX_ENABLED_PATCHED_V233 = bytes.fromhex(
     "034840396300003642000037e1031faae0031faafd835ff8fe0744f8c0035fd6"
 )
 
 PATTERNS = [
-    ("exebox_newbox", EXEBOX_CLEAN, EXEBOX_PATCHED),
-    ("is_sandbox_enabled", SANDBOX_ENABLED_CLEAN, SANDBOX_ENABLED_PATCHED),
+    ("exebox_newbox_v234", EXEBOX_CLEAN_V234, EXEBOX_PATCHED_V234),
+    ("exebox_newbox_v233", EXEBOX_CLEAN_V233, EXEBOX_PATCHED_V233),
+    ("is_sandbox_enabled_v234", SANDBOX_ENABLED_CLEAN_V234, SANDBOX_ENABLED_PATCHED_V234),
+    ("is_sandbox_enabled_v233", SANDBOX_ENABLED_CLEAN_V233, SANDBOX_ENABLED_PATCHED_V233),
 ]
 
-EXPECTED_COUNT = len(PATTERNS)
+EXPECTED_COUNT = 2
 
 
 def _find_all(data: Union[bytes, bytearray, memoryview], needle: bytes) -> List[int]:

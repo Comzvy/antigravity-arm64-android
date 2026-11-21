@@ -35,7 +35,7 @@ class TestElfValidator(unittest.TestCase):
             elf_header.validate_elf_header(self.archive_path)
 
     def test_03_checksum_verification(self):
-        expected_binary_sha = "9772a2fd0d7654b317d439afec450a051018d0c69c9fb96e642a801846170fec"
+        expected_binary_sha = "384fd3a5a467a136c44cd32d148ec75cd165ca6fbcb8aa57166cf7c7e59421d2"
         tmp_dir = tempfile.mkdtemp(prefix="agy_elf_test_")
         try:
             extracted_bin = os.path.join(tmp_dir, "language_server")
