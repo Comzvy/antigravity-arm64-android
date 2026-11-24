@@ -10,9 +10,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (e.g. v2.34.0)'
+        description: 'Release Tag (e.g. v2.35.0)'
         required: false
-        default: 'v2.34.0'
+        default: 'v2.35.0'
       draft:
         description: 'Create Draft Release'
         type: boolean
@@ -63,24 +63,22 @@ jobs:
         run: |
           mkdir -p tools env/bootstrap modules/core/pristine
 
-          # 1. Hydrate Bionic bootstrap if absent
-          if [ ! -f "env/bootstrap/bootstrap.tar.gz" ] && [ ! -f "env/bootstrap/bootstrap-aarch64.zip" ]; then
-            echo "[CI] Hydrating bootstrap.tar.gz from v2.33.0 release..."
-            if gh release download v2.33.0 -p antigravity.apk -D /tmp --clobber; then
-              python3 -c "import zipfile, shutil; z=zipfile.ZipFile('/tmp/antigravity.apk'); shutil.copyfileobj(z.open('assets/env/bootstrap/bootstrap.tar.gz'), open('env/bootstrap/bootstrap.tar.gz','wb'))"
-              rm -f /tmp/antigravity.apk
-            else
-              echo "[CI] Fallback: downloading Termux bootstrap-aarch64.zip..."
+          # 1. Hydrate Bionic bootstrap from upstream Termux packages if absent
+          if [ ! -f "env/bootstrap/bootstrap.tar.gz" ]; then
+            if [ ! -f "env/bootstrap/bootstrap-aarch64.zip" ]; then
+              echo "[CI] Downloading upstream Termux bootstrap-aarch64.zip..."
               gh release download -R termux/termux-packages -p bootstrap-aarch64.zip -D env/bootstrap --clobber || \
-              curl -fsSL -o env/bootstrap/bootstrap-aarch64.zip "https://github.com/termux/termux-packages/releases/latest/download/bootstrap-aarch64.zip"
+              curl -fsSL --retry 5 -o env/bootstrap/bootstrap-aarch64.zip "https://github.com/termux/termux-packages/releases/latest/download/bootstrap-aarch64.zip"
             fi
+            bash env/build.sh bootstrap
           fi
+          bash env/build.sh assets
 
-          # 2. Hydrate pristine Antigravity v2.34.0 Linux ARM64 language_server if absent
+          # 2. Hydrate pristine Antigravity v2.35.0 Linux ARM64 language_server if absent
           if [ ! -f "modules/core/pristine/language_server.tar.gz" ]; then
-            echo "[CI] Downloading Antigravity v2.34.0 Linux ARM64 language_server..."
-            curl -fsSL -o /tmp/language_server "https://storage.googleapis.com/antigravity-public/antigravity-hub/2.34.0-5887025308631040/unsigned/language_server-linux-arm64"
-            echo "384fd3a5a467a136c44cd32d148ec75cd165ca6fbcb8aa57166cf7c7e59421d2  /tmp/language_server" | sha256sum -c -
+            echo "[CI] Downloading Antigravity v2.35.0 Linux ARM64 language_server..."
+            curl -fsSL --retry 3 -o /tmp/language_server "https://storage.googleapis.com/antigravity-public/antigravity-hub/2.35.0-6394266482769920/unsigned/language_server-linux-arm64"
+            echo "eac9fe86ffcdd807af0843fd18bd2735e38884907bbdc3535641932fe9279f0b  /tmp/language_server" | sha256sum -c -
             chmod 0755 /tmp/language_server
             tar -C /tmp -czf modules/core/pristine/language_server.tar.gz language_server
             rm -f /tmp/language_server
@@ -163,11 +161,13 @@ jobs:
             | **`antigravity.apk`** | `com.agy` | Production release (`port 45157`, Android 7.0+ ARM64) |
             | **`SHA256SUMS.txt`** | — | SHA-256 checksum for package verification |
 
-            ### What's New in v2.34.0
+            ### What's New in v2.35.0
 
-            - **Upstream v2.34.0 Core & Web Sync:** Updated native ARM64 `language_server` (`go1.28-20261102-RC01`), web workbench assets, binary patchers (`crash_suppressor`, `nosandbox`), and `web/patch_main.py`.
-            - **Skills & Plugins Catalogue:** Browse and one-tap install `10` plugins (`rtk`, `antislop`, `superpowers`, `impeccable`, `context-mode`, `agents-suite`, `planning-with-files`, `sepia`, `gemini-agent-skills`, `antigravity-skills-manager`) and `23` skills under **Settings ➔ Skills & Plugins**, **Settings ➔ Appearance**, or `/customizations`.
-            - **Persistent Notification with Stop Control:** Status bar notification stays pinned while active and includes a **Stop** button for clean shutdown of the app, core server, HTTP gateway, wake locks, and `agy-daemon`.
+            - **Upstream v2.35.0 Core & Web Sync:** Updated native Linux ARM64 `language_server` (`go1.28-20261102-RC01`, `216,421,040` bytes) and web workbench assets (`main.js`, `compiled_tailwind.css`, `prism/`, `symbols-icons/`).
+            - **Drag Conversations to Folders:** Drag and drop conversations directly into any available folder — Workspace/Project folders (local & remote), Custom Groups, Pinned, or Standalone — using the row grip handle (`⋮⋮`), touch long-press, or mouse drag in Desktop Mode.
+            - **Composer `+` Button IME Fix (#1):** Fixed soft keyboard focus contention when tapping the chat composer `+` ("Add context") button repeatedly.
+            - **Streamlined Settings:** Kept **Desktop Mode** under **Settings ➔ Appearance**; **AI Models & API Keys** and **Skills & Plugins Catalogue** live in their dedicated Settings sections and `/customizations`.
+            - **Localization & Build Pipeline:** Standardized file download notifications and documentation to English, and automated Bionic bootstrap builds directly from upstream `termux/termux-packages`.
 
             ### Core Capabilities
 

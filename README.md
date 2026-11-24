@@ -3,7 +3,7 @@
   <h1>Antigravity for Android</h1>
   <p>
     Run the <strong>Antigravity AI coding agent on Android</strong> (ARM64 APK).<br />
-    Antigravity <strong>v2.34.0</strong> (Linux ARM64) runs natively on Android Bionic — no PRoot or chroot.
+    Antigravity <strong>v2.35.0</strong> (Linux ARM64) runs natively on Android Bionic — no PRoot or chroot.
   </p>
   <p>
     <a href="https://github.com/Comzvy/antigravity-arm64-android/releases/latest"><img src="https://img.shields.io/github/v/release/Comzvy/antigravity-arm64-android?style=flat-square&color=38bdf8" alt="Release" /></a>
@@ -31,12 +31,12 @@
 
 ## Features
 
-- **Native Bionic core** — runs Antigravity v2.34.0 (`language_server`) directly on Android ARM64 with `liblse_compat.so` (ARMv8.0-A+ LSE/SIMD emulation, no PRoot/chroot).
+- **Native Bionic core** — runs Antigravity v2.35.0 (`language_server`) directly on Android ARM64 with `liblse_compat.so` (ARMv8.0-A+ LSE/SIMD emulation, no PRoot/chroot).
 - **Multi-provider AI (BYOK)** — Gemini, OpenAI, Anthropic Claude, OpenRouter, Groq, DeepSeek, or any OpenAI/Anthropic-compatible endpoint.
 - **Skills & Plugins Catalogue** — built-in catalogue (`10` plugins, `23` skills) with one-tap install and uninstall under **Settings ➔ Skills & Plugins**.
+- **Touch & Desktop UX** — drag conversations into any folder (Workspaces/Projects, Groups, Pinned), responsive bottom sheets without IME focus conflicts, Desktop Mode toggle, dark/light theme sync, wake lock, file picker, and persistent Stop notification.
 - **Voice mode** — on-device speech recognition, cloud transcription (Whisper / Gemini), and native text-to-speech.
 - **Built-in terminal** — PTY bash shell, `pkg` package manager, and `agy-daemon` background task scheduler.
-- **Android UX & lifecycle** — dark/light theme sync, wake lock, file picker, bottom sheets, and a persistent status bar notification with a **Stop** button.
 - **Shizuku integration** — optional elevated ADB shell (`rish`) and status bar notifications (`agy-notify`).
 
 ## Quick Start

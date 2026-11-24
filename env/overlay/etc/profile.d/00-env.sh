@@ -1,4 +1,4 @@
-# 00-env.sh -- core environment of the tlx prefix.
+# 00-env.sh -- core environment of the Antigravity Android prefix.
 export HOME="${HOME:-$(dirname "$PREFIX")}"
 export TMPDIR="$PREFIX/tmp"
 export PATH="$PREFIX/bin"

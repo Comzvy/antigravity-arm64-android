@@ -1,5 +1,22 @@
 # Release Notes — Antigravity for Android (ARM64)
 
+## v2.35.0
+
+### Core Runtime & Web Sync
+- **Upstream Antigravity v2.35.0 (Linux ARM64):** Synced the native Linux AArch64 `language_server` (`216,421,040` bytes, Go `go1.28-20261102-RC01`, build `2.35.0-6394266482769920`) and updated web workbench assets (`main.js`, `compiled_tailwind.css`, `prism/`, `symbols-icons/`, `page_agent_bundle.js`, `page_facade_bundle.js`).
+- **Updated Web Patchers & Node Parity:** Updated `patch_agent_stream_resync` for v2.35.0 `StreamAgentStateUpdates` (`pda`), added `web/patch_main.js` with byte-for-byte parity alongside `web/patch_main.py`, and synced CI verification hashes.
+
+### Conversation Drag-to-Folder & Mobile UI Fixes
+- **Drag Conversations into Available Folders (`__agDragFoldersPatch`):** Added full touch and desktop drag-and-drop for moving conversations between Workspace/Project folders (both local and remote), Custom Groups, Pinned, and Standalone sections — complete with a touch grip handle (`⋮⋮`), 170 ms touch-hold arming with haptic feedback, auto-scroll, and scroll locking during drag.
+- **Fixed Composer `+` Button vs IME Soft Keyboard Conflict (#1):** Prevented the "Add context" (`+`) menu's `finalFocus` from re-focusing the editor on dismissal, and added touch/mousedown coordination in `web/src/patches/web_optimizations/taps.js` so repeated taps open the `+` menu reliably without IME resize swallowing clicks.
+- **Appearance Settings Cleanup:** Removed redundant **AI Models & API Keys** and **Skills & Plugins Catalogue** buttons from **Settings ➔ Appearance** (keeping **Desktop Mode** there; AI Models and Skills/Plugins remain in their dedicated Settings sections and `/customizations`).
+
+### Localization & Build Pipeline
+- **English UI & Documentation:** Standardized `FileDownloader.java` download status messages and subsystem documentation to English.
+- **Upstream Termux Bootstrap Build:** Automated CI Bionic bootstrap packaging directly from upstream `termux/termux-packages` `bootstrap-aarch64.zip` via `env/build.sh`.
+
+---
+
 ## v2.34.0
 
 ### Core Runtime & Web Sync

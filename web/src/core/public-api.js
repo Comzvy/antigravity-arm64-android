@@ -1,7 +1,5 @@
 /**
  * core/public-api.js - expose window.__agBridgeCore.
- *
- * Dead entries listed in docs/DEADCODE.md are not ported.
  */
 var api = {
   version: VERSION,

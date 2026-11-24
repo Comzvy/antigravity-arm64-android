@@ -10,9 +10,6 @@
  * Rewrite file:// or relative ConnectRPC URLs onto the core origin, preserving
  * method/headers/body and attaching the CSRF token. Idempotent and a no-op for
  * non-RPC / already-absolute http(s) URLs.
- *
- * The original periodic HEAD ping is not ported (it referenced an undefined
- * helper; see docs/DEADCODE.md).
  */
 var RPC_MARKERS = ['exa.language_server_pb.', 'exa.host_bridge_pb.', '/exa.'];
 

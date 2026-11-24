@@ -1,5 +1,5 @@
 #!/data/data/com.agy/files/usr/bin/bash
-# pkg -- self-written package manager for the tlx environment.
+# pkg -- self-written package manager for the Antigravity Android environment.
 set -uo pipefail
 
 PKG_SELF="$(cd "$(dirname "$0")" && pwd)"
@@ -317,7 +317,7 @@ cmd_why() {
 
 cmd_help() {
     cat <<EOF
-pkg $PKG_VERSION -- tlx package manager
+pkg $PKG_VERSION -- Antigravity package manager
 
   pkg update              fetch repository indexes
   pkg upgrade             upgrade installed packages

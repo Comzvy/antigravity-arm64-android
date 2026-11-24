@@ -1,7 +1,7 @@
 Package: hello
 Version: 1.0.0
 Architecture: aarch64
-Maintainer: tlx
+Maintainer: antigravity
 Installed-Size: 10
 Depends: libhello (>= 1.0), world | glob
 Filename: pool/main/h/hello/hello_1.0.0_aarch64.deb

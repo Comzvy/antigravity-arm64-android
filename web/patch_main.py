@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """
-web/patch_main.py - Dynamic patcher for web/main.js (supports v2.34.0, v2.33.0, and v2.11.0).
+web/patch_main.py - Dynamic patcher for web/main.js (supports v2.35.0, v2.34.0, and v2.33.0).
 
-Locates the Appearance settings block and injects the Desktop Mode toggle,
-AI Models & API Keys button, Android Voice-to-Text (__agVoiceBridge) hooks,
-responsive onboarding/login layout, and MCP/Plugins fallback if not already present.
+Locates and patches:
+1. Appearance settings: Desktop Mode toggle (leaving AI Models & Catalogue in Settings nav / Customizations).
+2. Voice input: default experiment flags & Android Voice-to-Text (__agVoiceBridge) hooks.
+3. Onboarding layout: responsive cards & non-sandboxed mobile terminal defaults.
+4. MCP & Plugins fallback (__agMcpPluginsFallback).
+5. Voice mode AudioWorklet & getUserMedia mic contention fixes (__agVoiceMicWorkletPatch).
+6. Remote project loading & default feature flags (__agRemoteStartupPatch).
+7. Agent state stream resync on resume/online/stall (__agStreamResyncPatch).
+8. Composer '+' Add context bottom sheet IME focus conflict fix (__agComposerPlusPatch).
+9. Sidebar conversation drag-and-drop into folders on touch and desktop (__agDragFoldersPatch).
 """
 
 import sys
@@ -13,15 +20,10 @@ import re
 
 
 def patch_appearance(content):
-    if '"Kelola API Key"' in content:
-        content = content.replace('"Kelola API Key"', '"Manage Keys"')
-        print("[web-patch] Updated AI Models button label to English in main.js")
-        return content, True
-    if ("Desktop Mode" in content or "ag_desktop_mode" in content) and "__agOpenCatalogueModal" in content:
-        print("[web-patch] Desktop Mode & AI Models toggle already present in main.js")
+    if "Desktop Mode" in content or "ag_desktop_mode" in content:
+        print("[web-patch] Desktop Mode toggle already present in main.js")
         return content, False
 
-    # Localize searches around {label:"Theme" to avoid scanning the full bundle with backtracking regexes
     hook_pattern_v211 = re.compile(
         r'(var\s+[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==3,\s*[A-Za-z0-9_$]+=[A-Za-z0-9_$]+!==2,\s*[A-Za-z0-9_$]+=[A-Za-z0-9_$]+=>\s*[A-Za-z0-9_$]+=>\{[^}]{0,400}\};)'
     )
@@ -81,19 +83,13 @@ def patch_appearance(content):
         orig_theme
         + f',{react_id}.createElement({item_comp},{{label:"Desktop Mode",description:"Use desktop viewport and user agent for the workspace",'
         + f'rightElement:{react_id}.createElement({switch_comp},{{checked:isDesktop,onCheckedChange:onDesktopToggle}})}})'
-        + f',{react_id}.createElement({item_comp},{{label:"AI Models & API Keys",description:"Use Gemini, OpenAI, Claude, OpenRouter, DeepSeek, Groq, or Custom API Keys",'
-        + f'rightElement:{react_id}.createElement("button",{{type:"button",onClick:()=>{{if(window.__agOpenAiModelsModal)window.__agOpenAiModelsModal()}},'
-        + f'className:"px-3 py-1 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 cursor-pointer"}},"Manage Keys")}})'
-        + f',{react_id}.createElement({item_comp},{{label:"Skills & Plugins Catalogue",description:"Browse and install 10 plugins and 23 agent skills",'
-        + f'rightElement:{react_id}.createElement("button",{{type:"button",onClick:()=>{{if(window.__agOpenCatalogueModal)window.__agOpenCatalogueModal("plugins")}},'
-        + f'className:"px-3 py-1 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:opacity-90 cursor-pointer"}},"Browse")}})'
     )
 
     hook_abs_start = win_start + hook_match.start(1)
     hook_abs_end = win_start + hook_match.end(1)
     content = content[:hook_abs_start] + injected_hook + content[hook_abs_end:]
     content = content.replace(orig_theme, injected_theme, 1)
-    print(f"[web-patch] Successfully patched Desktop Mode & AI Models into main.js (react={react_id}, item={item_comp}, switch={switch_comp})")
+    print(f"[web-patch] Successfully patched Desktop Mode into Appearance (react={react_id}, item={item_comp}, switch={switch_comp})")
     return content, True
 
 
@@ -104,7 +100,6 @@ def patch_voice_input(content):
 
     modified = False
 
-    # 1. Force default-enabled experiment flags when Mendel flags have not loaded yet
     exp_re = re.compile(
         r'c\|\|\(c=([A-Za-z0-9_$]+)\(a\.stateProvider,([A-Za-z0-9_$]+)=>\(\2=\2\[b\]\)\?!\2\.disabled:!1\),a\.experimentEnabledProviders\.set\(b,c\)\)'
     )
@@ -113,20 +108,18 @@ def patch_voice_input(content):
         fn_id, arg_id = m_exp.group(1), m_exp.group(2)
         repl = (
             f'c||(c={fn_id}(a.stateProvider,{arg_id}=>({arg_id}={arg_id}[b])?!{arg_id}.disabled:'
-            '(b==="enable-audio-transcription"||b==="enable-remote-ai"||b==="enable-github-decorator"||b==="enable-voice-relay")),'
+            '(b==="enable-audio-transcription"||b==="enable-remote-ai"||b==="enable-github-decorator"||b==="enable-voice-relay"||b==="enable-move-conversation-to-project")),'
             'a.experimentEnabledProviders.set(b,c))'
         )
         content = content[:m_exp.start()] + repl + content[m_exp.end():]
         modified = True
 
-    # 2. Ensure hasMicrophone returns true when Android voice bridge is available
     mic_orig = 'var h=g(await f(navigator.mediaDevices.enumerateDevices())).some(k=>k.kind==="audioinput");b(h)}else b(!1)'
     mic_repl = 'var h=g(await f(navigator.mediaDevices.enumerateDevices())).some(k=>k.kind==="audioinput");b(h||!!window.__agVoiceBridge?.hasMicrophone?.())}else b(!!window.__agVoiceBridge?.hasMicrophone?.())'
     if mic_orig in content:
         content = content.replace(mic_orig, mic_repl, 1)
         modified = True
 
-    # 3. Route streamAudioTranscription / sendAudioChunk / endAudioSession through window.__agVoiceBridge
     rpc_re_v233 = re.compile(
         r'streamAudioTranscription:\(\.\.\.([A-Za-z0-9_$]+)\)=>\s*f\(([A-Za-z0-9_$]+)=>\2\.streamAudioTranscription\(\.\.\.\1\)\),'
         r'sendAudioChunk:async\s+([A-Za-z0-9_$]+)=>f\(async\s+([A-Za-z0-9_$]+)=>\4\.sendAudioChunk\(\3\)\),'
@@ -142,24 +135,7 @@ def patch_voice_input(content):
         )
         content = content[:m_rpc.start()] + repl + content[m_rpc.end():]
         modified = True
-    else:
-        rpc_orig = (
-            'streamAudioTranscription:(...n)=>\n'
-            'f("streamAudioTranscription",n[0],q=>q.streamAudioTranscription(...n)),'
-            'sendAudioChunk:async n=>f(async q=>q.sendAudioChunk(n)),'
-            'endAudioSession:async n=>f(async q=>q.endAudioSession(n)),'
-        )
-        rpc_repl = (
-            'streamAudioTranscription:(...n)=>\n'
-            'window.__agVoiceBridge?window.__agVoiceBridge.streamAudioTranscription(n[0],n[1],()=>f("streamAudioTranscription",n[0],q=>q.streamAudioTranscription(...n))):f("streamAudioTranscription",n[0],q=>q.streamAudioTranscription(...n)),'
-            'sendAudioChunk:async n=>window.__agVoiceBridge?window.__agVoiceBridge.sendAudioChunk(n,()=>f(async q=>q.sendAudioChunk(n))):f(async q=>q.sendAudioChunk(n)),'
-            'endAudioSession:async n=>window.__agVoiceBridge?window.__agVoiceBridge.endAudioSession(n,()=>f(async q=>q.endAudioSession(n))):f(async q=>q.endAudioSession(n)),'
-        )
-        if rpc_orig in content:
-            content = content.replace(rpc_orig, rpc_repl, 1)
-            modified = True
 
-    # 4. Avoid locking WebView getUserMedia when Android native SpeechRecognizer is active
     mic_ctrl_re = re.compile(
         r'(async function [A-Za-z0-9_$]+\(a,b\)\{)(var c=e,d=e;try\{let f=typeof b==="string"\|\|b===void 0\?\{deviceId:b,autoGainControl:!1\}:b)'
     )
@@ -183,14 +159,9 @@ def patch_voice_input(content):
 def patch_onboarding_layout(content):
     modified = False
 
-    # 1. Responsive login card and onboarding picker cards on narrow mobile viewports
-    login_v233_orig = 'className:"relative border border-border bg-card rounded-2xl shadow-sm !bg-card/90 w-[480px] max-w-full max-h-[440px] overflow-y-auto [scrollbar-gutter:stable_both-edges] p-6 flex flex-col items-center gap-4 mb-4"'
-    login_v233_repl = 'className:"relative border border-border bg-card rounded-2xl shadow-sm !bg-card/90 w-full max-w-[440px] box-border max-h-[440px] overflow-y-auto [scrollbar-gutter:stable_both-edges] p-6 flex flex-col items-center gap-4 mb-4"'
-    if login_v233_orig in content:
-        content = content.replace(login_v233_orig, login_v233_repl)
-        modified = True
-
     for old_cls, new_cls in [
+        ('className:"relative border border-border bg-card rounded-2xl shadow-sm !bg-card/90 w-[480px] max-w-full max-h-[440px] overflow-y-auto [scrollbar-gutter:stable_both-edges] p-6 flex flex-col items-center gap-4 mb-4"',
+         'className:"relative border border-border bg-card rounded-2xl shadow-sm !bg-card/90 w-full max-w-[440px] box-border max-h-[440px] overflow-y-auto [scrollbar-gutter:stable_both-edges] p-6 flex flex-col items-center gap-4 mb-4"'),
         ('className:"w-[480px] max-w-full min-h-0 max-h-full flex flex-col overflow-hidden p-6"',
          'className:"w-full max-w-[440px] box-border min-h-0 max-h-full flex flex-col overflow-hidden p-6"'),
         ('className:"w-[480px] max-w-full p-6"',
@@ -200,7 +171,6 @@ def patch_onboarding_layout(content):
             content = content.replace(old_cls, new_cls)
             modified = True
 
-    # 2. Disable desktop terminal sandbox in permission presets on Android
     for old_s, new_s in [
         ('enableTerminalSandbox:!0,cascadeAutoExecutionPolicy:F.CascadeCommandsAutoExecution.PROCEED_IN_SANDBOX',
          'enableTerminalSandbox:!1,cascadeAutoExecutionPolicy:F.CascadeCommandsAutoExecution.EAGER'),
@@ -258,7 +228,6 @@ def patch_voice_mode_worklet(content):
 
     modified = False
 
-    # 1. Load ./audio_processor.js ('self') with Blob/data fallback instead of bare data: URL
     w_anchor = content.find('.audioWorklet.addModule("data:application/javascript;base64,"+btoa(')
     if w_anchor != -1:
         w_start = max(0, w_anchor - 40)
@@ -281,7 +250,6 @@ def patch_voice_mode_worklet(content):
             content = content[:w_start + m_w.start()] + repl + content[w_start + m_w.end():]
             modified = True
 
-    # 2. Release any native SpeechRecognizer hold and retry getUserMedia with simpler constraints
     g_anchor = content.find('return navigator.mediaDevices.getUserMedia({audio:')
     if g_anchor != -1:
         g_start = max(0, g_anchor - 220)
@@ -316,14 +284,13 @@ def patch_voice_mode_worklet(content):
 
 
 def patch_remote_projects_startup(content):
-    """Ensure remote/GitHub projects load immediately at startup without waiting for delayed Mendel sync."""
+    """Ensure remote/GitHub projects and folder-move config load immediately at startup."""
     if "__agRemoteStartupPatch" in content:
         print("[web-patch] Remote projects startup patch already present in main.js")
         return content, False
 
     modified = False
 
-    # 1. Default enable-remote-ai, enable-github-decorator, enable-voice-relay, enable-audio-transcription in Ui()
     ui_anchor = content.find('.experiments[')
     if ui_anchor != -1:
         ui_start = max(0, ui_anchor - 80)
@@ -337,12 +304,11 @@ def patch_remote_projects_startup(content):
             hdr, a_var, b_var = m_ui.groups()
             repl = (
                 f'{hdr}/*__agRemoteStartupPatch*/var _x={a_var}.experiments[{b_var}];return _x?!_x.disabled:'
-                f'({b_var}==="enable-audio-transcription"||{b_var}==="enable-remote-ai"||{b_var}==="enable-github-decorator"||{b_var}==="enable-voice-relay")}}'
+                f'({b_var}==="enable-audio-transcription"||{b_var}==="enable-remote-ai"||{b_var}==="enable-github-decorator"||{b_var}==="enable-voice-relay"||{b_var}==="enable-move-conversation-to-project")}}'
             )
             content = content[:ui_start + m_ui.start()] + repl + content[ui_start + m_ui.end():]
             modified = True
 
-    # 2. Include those default-enabled flags in $la() before Mendel finishes warming up
     af_anchor = content.find('.experiments;return Object.keys(')
     if af_anchor != -1:
         af_start = max(0, af_anchor - 80)
@@ -356,13 +322,12 @@ def patch_remote_projects_startup(content):
             hdr, _a_var, b_var, c_var = m_af.groups()
             repl = (
                 f'{hdr}var _k=Object.keys({b_var}).filter({c_var}=>!{b_var}[{c_var}]?.disabled);'
-                f'for(var _f of["enable-audio-transcription","enable-remote-ai","enable-github-decorator","enable-voice-relay"])'
+                f'for(var _f of["enable-audio-transcription","enable-remote-ai","enable-github-decorator","enable-voice-relay","enable-move-conversation-to-project"])'
                 f'!{b_var}[_f]&&!_k.includes(_f)&&_k.push(_f);return _k}}'
             )
             content = content[:af_start + m_af.start()] + repl + content[af_start + m_af.end():]
             modified = True
 
-    # 3. Retry GetMendelFlags quickly when initial call returns {} during server startup refresh
     mr_anchor = content.find('flagOverrideSync.retry()')
     if mr_anchor != -1:
         mr_start = max(0, mr_anchor - 260)
@@ -381,7 +346,6 @@ def patch_remote_projects_startup(content):
             content = content[:mr_start + m_mr.start()] + repl + content[mr_start + m_mr.end():]
             modified = True
 
-    # 4. Poll listProjects({backend:2}) on cloud startup until server finishes auth/state refresh
     cs_anchor = content.find('projectUpdatesStream({backend:2}')
     if cs_anchor != -1:
         cs_start = max(0, cs_anchor - 120)
@@ -403,7 +367,6 @@ def patch_remote_projects_startup(content):
             content = content[:cs_start + m_cs.start()] + repl + content[cs_start + m_cs.end():]
             modified = True
 
-    # 5. Allow retrying GitHub repository fetch after transient startup errors
     gh_anchor = content.find('("github/repo").then(')
     if gh_anchor != -1:
         gh_start = max(0, gh_anchor - 40)
@@ -426,7 +389,7 @@ def patch_remote_projects_startup(content):
 
 
 def patch_agent_stream_resync(content):
-    """Add resume/visibility/stall recovery to consumeAgentStateStream (kda)."""
+    """Add resume/visibility/stall recovery to consumeAgentStateStream (v2.35 pda & v2.34 kda)."""
     if "__agStreamResyncPatch" in content:
         print("[web-patch] Agent stream resync patch already present in main.js")
         return content, False
@@ -437,9 +400,69 @@ def patch_agent_stream_resync(content):
         return content, False
 
     win_start = max(0, anchor - 2500)
-    win_end = min(len(content), anchor + 500)
+    win_end = min(len(content), anchor + 600)
     window = content[win_start:win_end]
 
+    # v2.35.0 layout (pda(a,b,c,d,f))
+    v235_re = re.compile(
+        r'(async function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\)\{'
+        r'var ([A-Za-z0-9_$]+)=e,([A-Za-z0-9_$]+)=e;try\{let \{initialStepsSlice:[^}]+\}=[^,]+,([A-Za-z0-9_$]+)=[A-Za-z0-9_$]+\(\3\),[^;]+;'
+        r'for\(;!\5\.signal\.aborted;\)\{if\([A-Za-z0-9_$]+\)\{[^}]+\}let [A-Za-z0-9_$]+=[A-Za-z0-9_$]+\(\);[A-Za-z0-9_$]+\?\.\([A-Za-z0-9_$]+\);let ([A-Za-z0-9_$]+)=1E3;)'
+        r'(try\{let ([A-Za-z0-9_$]+)=[A-Za-z0-9_$]+\([^.]+\.StreamAgentStateUpdatesRequestSchema,\s*\{[^}]+\}\)),([A-Za-z0-9_$]+)=\2\(\12,\{signal:\5\.signal\}\);var ([A-Za-z0-9_$]+)=!1;(for await\(let [A-Za-z0-9_$]+ of \7\(\13\)\)\{\8\(\);try\{)'
+        r'(.*?\[consumeAgentStateStream\] streamAgentStateUpdates error:.*?if\(!\14\)break\})'
+        r'\5\.signal\.aborted\|\|\8\(await \7\(([A-Za-z0-9_$]+)\(\10,\5\.signal\)\)\);',
+        re.DOTALL,
+    )
+    m = v235_re.search(window)
+    if m:
+        (
+            hdr, a_arg, _b_arg, _c_arg, d_arg, _f_arg,
+            g_var, h_var, a_state, i_var,
+            req_try, j_var, l_stream_var, k_flag, for_hdr,
+            body_to_break, mda_fn,
+        ) = m.groups()
+        reset_m = re.search(rf'{re.escape(k_flag)}=!0,([A-Za-z0-9_$]+)=([A-Za-z0-9_$]+)=([A-Za-z0-9_$]+)=0', body_to_break)
+        reset_stmt = f'{reset_m.group(1)}=0;{reset_m.group(2)}=0;{reset_m.group(3)}=0' if reset_m else ''
+        catch_re = re.compile(
+            rf'(.*?\}})(catch\(([A-Za-z0-9_$]+)\)\{{{re.escape(h_var)}\(\);if\({re.escape(d_arg)}\.signal\.aborted\)break;{re.escape(k_flag)}=!0;)(.*)(if\(!{re.escape(k_flag)}\)break\}})$',
+            re.DOTALL,
+        )
+        mc = catch_re.match(body_to_break)
+        if mc:
+            try_tail, catch_hdr, _err_var, catch_body, catch_tail = mc.groups()
+            setup = (
+                f'/*__agStreamResyncPatch*/'
+                f'var _ac=new AbortController(),_rs=!1,_lm=Date.now(),'
+                f'_wh=typeof document!=="undefined"&&document.hidden,'
+                f'_oa=()=>{{_ac.abort({d_arg}.signal.reason)}},'
+                f'_tr=()=>{{if(!_rs&&!{d_arg}.signal.aborted){{_rs=!0;_ac.abort("agy_stream_resync")}}}},'
+                f'_ov=()=>{{if(typeof document!=="undefined"){{if(document.visibilityState==="hidden")_wh=!0;else if(_wh){{_wh=!1;_tr()}}}}}},'
+                f'_oh=()=>{{if(_wh||Date.now()-_lm>3E3)_wh=!1,_tr()}};'
+                f'{d_arg}.signal.addEventListener("abort",_oa,{{once:!0}});'
+                f'if(typeof document!=="undefined")document.addEventListener("visibilitychange",_ov);'
+                f'if(typeof window!=="undefined"){{window.addEventListener("agy:host-resume",_oh);window.addEventListener("online",_tr)}}'
+                f'var _wd=setInterval(()=>{{if(!_rs&&!{d_arg}.signal.aborted&&({a_state}.status===2||{a_state}.executableStatus===2||{a_state}.executorLoopStatus===2||{a_state}.fullyIdle===!1)&&Date.now()-_lm>2E4)_tr()}},5E3);'
+                f'try{{'
+            )
+            cleanup = (
+                f'}}finally{{clearInterval(_wd);{d_arg}.signal.removeEventListener("abort",_oa);'
+                f'if(typeof document!=="undefined")document.removeEventListener("visibilitychange",_ov);'
+                f'if(typeof window!=="undefined"){{window.removeEventListener("agy:host-resume",_oh);window.removeEventListener("online",_tr)}}}}'
+                f'{d_arg}.signal.aborted||{h_var}(await {g_var}({mda_fn}(_rs?50:{i_var},{d_arg}.signal)));'
+            )
+            else_clause = f'else{{{reset_stmt}}}' if reset_stmt else ''
+            repl = (
+                f'{hdr}{setup}'
+                f'{req_try},{l_stream_var}={a_arg}({j_var},{{signal:_ac.signal}});var {k_flag}=!1;{for_hdr}_lm=Date.now();'
+                f'{try_tail}{catch_hdr}if(!_rs){{{catch_body}}}{else_clause}{catch_tail}'
+                f'{cleanup}'
+            )
+            new_window = window[:m.start()] + repl + window[m.end():]
+            content = content[:win_start] + new_window + content[win_end:]
+            print("[web-patch] Successfully patched v2.35 consumeAgentStateStream (__agStreamResyncPatch)")
+            return content, True
+
+    # v2.34.0 fallback (kda)
     kda_re = re.compile(
         r'(async function [A-Za-z0-9_$]+\(([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\)\{'
         r'var ([A-Za-z0-9_$]+)=e,([A-Za-z0-9_$]+)=e;try\{let \{initialStepsSlice:[^}]+\}=[^,]+,([A-Za-z0-9_$]+)=[A-Za-z0-9_$]+\(\3\),[A-Za-z0-9_$]+=[A-Za-z0-9_$]+,[A-Za-z0-9_$]+=0;'
@@ -503,12 +526,220 @@ def patch_agent_stream_resync(content):
     return content, True
 
 
+def patch_composer_plus_button(content):
+    """Fix Issue #1: prevent '+' Add context sheet dismissal from auto-focusing IME input."""
+    if "__agComposerPlusPatch" in content:
+        print("[web-patch] Composer '+' IME conflict patch already present in main.js")
+        return content, False
+
+    anchor = content.find('"aria-label":"Add context"')
+    if anchor == -1:
+        print("[web-patch] WARNING: Add context button anchor not found in main.js", file=sys.stderr)
+        return content, False
+
+    win_start = max(0, anchor - 300)
+    win_end = min(len(content), anchor + 600)
+    win = content[win_start:win_end]
+
+    plus_re = re.compile(
+        r'("aria-label":"Add context",\s*"data-tooltip-id":[^}]+?\},\s*[A-Za-z0-9_$]+\.createElement\([^}]+\}\)\)\),\s*'
+        r'[A-Za-z0-9_$]+\.createElement\([A-Za-z0-9_$]+,\{side:[^,]+,align:[^,]+,)(finalFocus:[A-Za-z0-9_$]+\?[A-Za-z0-9_$]+:void 0)(,className:)'
+    )
+    m = plus_re.search(win)
+    if not m:
+        print("[web-patch] WARNING: Composer '+' finalFocus pattern did not match in main.js", file=sys.stderr)
+        return content, False
+
+    new_win = win[:m.start()] + f'{m.group(1)}/*__agComposerPlusPatch*/finalFocus:!1{m.group(3)}' + win[m.end():]
+    # Also ensure explicit button type so Android WebView never misinterprets button activation
+    new_win = new_win.replace('"aria-label":"Add context"', '"type":"button","aria-label":"Add context"', 1)
+    content = content[:win_start] + new_win + content[win_end:]
+    print("[web-patch] Successfully patched composer '+' menu IME conflict (__agComposerPlusPatch)")
+    return content, True
+
+
+def patch_conversation_drag_folders(content):
+    """Enable touch & desktop drag-and-drop to move conversations into any available folder."""
+    if "__agDragFoldersPatch" in content:
+        print("[web-patch] Conversation folder drag-and-drop already present in main.js")
+        return content, False
+
+    modified = False
+
+    # 1. Enable moveConversationToProject feature default so Workspace/Project folder drops & moves work
+    cfg_orig = 'moveConversationToProject:{feature:{enabled:!1}'
+    cfg_repl = 'moveConversationToProject:{/*__agDragFoldersPatch*/feature:{enabled:!0}'
+    if cfg_orig in content:
+        content = content.replace(cfg_orig, cfg_repl, 1)
+        modified = True
+
+    # 2. Unlock ALL non-placeholder, non-coordinator Workspace/Project folders (local + cloud)
+    t9c_anchor = content.find('a.project.id!=="outside-of-project"}')
+    if t9c_anchor != -1:
+        ts = max(0, t9c_anchor - 220)
+        te = min(len(content), t9c_anchor + 600)
+        twin = content[ts:te]
+        t9c_re = re.compile(
+            r'function ([A-Za-z0-9_$]+)\(a\)\{return [A-Za-z0-9_$]+\(a\)&&!a\.project\.coordinator&&a\.project\.id!=="outside-of-project"\}'
+            r'function ([A-Za-z0-9_$]+)\(a,b,c,d\)\{a=a&&a!=="outside-of-project"\?a:void 0;return a!==void 0\?c\.has\(a\):b\|\|d\}'
+        )
+        m_t = t9c_re.search(twin)
+        if m_t:
+            fn1, fn2 = m_t.groups()
+            repl = (
+                f'function {fn1}(a){{/*__agDragFoldersPatch*/return!!a?.project?.id&&!a.isPlaceholder&&!a.project.coordinator&&a.project.id!=="outside-of-project"}}'
+                f'function {fn2}(a,b,c,d){{a=a&&a!=="outside-of-project"?a:void 0;return a!==void 0?c.has(a):c.size>0||b||d}}'
+            )
+            twin = twin[:m_t.start()] + repl + twin[m_t.end():]
+            content = content[:ts] + twin + content[te:]
+            modified = True
+
+        # Update submenu icon from "cloud" to "folder" since local workspaces are also included
+        mv_anchor = content.find('id:"move-to-project"')
+        if mv_anchor != -1:
+            ms = mv_anchor
+            me = min(len(content), mv_anchor + 180)
+            mwin = content[ms:me]
+            mwin_new = re.sub(r'([A-Za-z0-9_$]+)\("cloud"\)', r'\1("folder")', mwin, count=1)
+            if mwin_new != mwin:
+                content = content[:ms] + mwin_new + content[me:]
+                modified = True
+
+    # 3. Allow sidebar row drag handlers on mobile too (remove !isMobile gate on Xb.type==="row")
+    row_gate_re = re.compile(r'if\(![A-Za-z0-9_$]+&&([A-Za-z0-9_$]+)\.type==="row"\)return ([A-Za-z0-9_$]+)\(\1\);')
+    m_rg = row_gate_re.search(content)
+    if m_rg:
+        row_var, prop_fn = m_rg.groups()
+        content = content[:m_rg.start()] + f'if({row_var}.type==="row")return {prop_fn}({row_var});' + content[m_rg.end():]
+        modified = True
+
+    # 4. Upgrade i6c pointer drag hook with touch long-press / drag-handle support
+    i6c_anchor = content.find('dataset.testid="pointer-drag-shield"')
+    if i6c_anchor != -1:
+        is_start = max(0, i6c_anchor - 2000)
+        is_end = min(len(content), i6c_anchor + 1000)
+        iwin = content[is_start:is_end]
+        i6c_re = re.compile(
+            r'(w=\(0,([A-Za-z0-9_$]+)\.useRef\)\(null\),x=\(0,\2\.useCallback\)\(\(\)=>\{q\.current\?\.remove\(\);q\.current=null\},\[\]\),'
+            r'y=\(0,\2\.useCallback\)\(\(\)=>\s*\{r\.current&&window\.removeEventListener\("pointermove",r\.current\);'
+            r'u\.current&&window\.removeEventListener\("pointerup",u\.current\);'
+            r'v\.current&&window\.removeEventListener\("pointercancel",v\.current\);'
+            r'w\.current&&window\.removeEventListener\("keydown",w\.current,!0\);'
+            r'r\.current=null;u\.current=null;v\.current=null;w\.current=null\},\[\]\);)'
+            r'(.*?\},\[y,x\]\);a=\(0,\2\.useCallback\)\(\(A,\s*B\)=>\{if\(B\.button===0&&!\(p\.current\|\|B\.target\?\.closest\?\.\("\[data-no-drag\]"\)\|\|'
+            r'B\.target\?\.closest\?\.\(\'input, textarea, \[contenteditable="true"\]\'\)\|\|document\.querySelector\([^)]+\)\)\)\{)'
+            r'y\(\);var C=n\.current,D=m\.current\.indexOf\(A\);if\(D!==-1\)\{'
+            r'var F=C\.getCoord\(B\),H=B\.clientX,I=B\.clientY,J=C\.threshold\?\?5,L=!1;'
+            r'k\.current&&\(clearTimeout\(k\.current\),k\.current=null,h\(!1\)\);'
+            r'B=P=>\{.*?\};'
+            r'var M=P=>\{.*?\};'
+            r'C=\(\)=>\{M\(!0\)\};var N=\(\)=>\{M\(!1\)\},O=P=>\{P\.key==="Escape"&&L&&\(P\.preventDefault\(\),P\.stopPropagation\(\),M\(!1\)\)\};'
+            r'r\.current=B;u\.current=C;v\.current=N;w\.current=O;'
+            r'window\.addEventListener\("pointermove",\s*B\);window\.addEventListener\("pointerup",C\);window\.addEventListener\("pointercancel",N\);window\.addEventListener\("keydown",O,!0\)\}\}',
+            re.DOTALL,
+        )
+        m_i = i6c_re.search(iwin)
+        if m_i:
+            y_block, react_id, mid_and_pd_header = m_i.groups()
+            y_new = re.sub(
+                r'r\.current=null;u\.current=null;v\.current=null;w\.current=null\},\[\]\);$',
+                f'r.current=null;u.current=null;v.current=null;w.current=null;_tc.current?.();_tc.current=null}},[]);var _tc=(0,{react_id}.useRef)(null);',
+                y_block,
+                count=1,
+            )
+            new_pd_body = (
+                'y();var C=n.current,D=m.current.indexOf(A);if(D!==-1){'
+                'var F=C.getCoord(B),H=B.clientX,I=B.clientY,J=C.threshold??5,L=!1,'
+                '_isT=B.pointerType==="touch",_dh=!!B.target?.closest?.("[data-agy-drag-handle]"),'
+                '_arm=!_isT||_dh,_tmr=null,_hb=!1;'
+                'k.current&&(clearTimeout(k.current),k.current=null,h(!1));'
+                'var _start=(P)=>{L=!0;p.current=!0;h(!0);'
+                'if(_isT&&!_hb){_hb=!0;try{window.Android?.performHapticFeedback?.("long_press")}catch(_){}}'
+                'document.body.style.cursor="grabbing";document.body.style.userSelect="none";x();'
+                'var R=document.createElement("div");R.dataset.testid="pointer-drag-shield";R.style.position="fixed";'
+                'R.style.inset="0";R.style.zIndex="9999";R.style.cursor="grabbing";R.style.touchAction="none";'
+                'document.body.appendChild(R);q.current=R;window.getSelection()?.removeAllRanges();'
+                'f(n.current.beginDrag({index:D,itemId:A,itemRefs:l.current,items:m.current,startCoord:F,startX:H,startY:I,event:P}))};'
+                'B=P=>{if(P.buttons===0)M(!1);else{var R=n.current.getCoord(P);'
+                'if(L)d.current!=null&&f(n.current.updateDrag(d.current,R,P));'
+                'else if(n.current.use2dThreshold?Math.max(Math.abs(P.clientX-H),Math.abs(P.clientY-I))>=J:Math.abs(R-F)>=J)_start(P)}};'
+                'var M=P=>{_tmr&&(clearTimeout(_tmr),_tmr=null);y();x();document.body.style.cursor="";document.body.style.userSelect="";'
+                'n.current.onDragEnd?.();if(L){if(P&&(P=d.current,P!=null&&(P=n.current.getReorder(P,m.current))))n.current.onReorder(P);'
+                'f(null);k.current=setTimeout(()=>{h(!1);k.current=null},100)}p.current=!1};'
+                'C=()=>{M(!0)};var N=()=>{M(!1)},O=P=>{P.key==="Escape"&&L&&(P.preventDefault(),P.stopPropagation(),M(!1))};'
+                'if(_isT){'
+                'if(!_arm){_tmr=setTimeout(()=>{_tmr=null;_arm=!0},170)}'
+                'var _tm=ev=>{var t=ev.touches?.[0];if(!t)return;'
+                'var se={clientX:t.clientX,clientY:t.clientY,buttons:1,target:ev.target,pointerType:"touch"},'
+                'dx=t.clientX-H,dy=t.clientY-I,dist=Math.hypot(dx,dy);'
+                'if(!L){if(!_arm){if(dist>9){M(!1)}return}if(dist<(_dh?2:6))return;'
+                'if(ev.cancelable)ev.preventDefault();_start(se);return}'
+                'if(ev.cancelable)ev.preventDefault();B(se)},'
+                '_te=ev=>{if(L&&ev.cancelable)ev.preventDefault();C()},'
+                '_tx=()=>{N()},'
+                '_cm=ev=>{if(!L)N();else{ev.preventDefault();ev.stopPropagation()}};'
+                '_tc.current=()=>{_tmr&&(clearTimeout(_tmr),_tmr=null);'
+                'window.removeEventListener("touchmove",_tm,{capture:!0});'
+                'window.removeEventListener("touchend",_te,{capture:!0});'
+                'window.removeEventListener("touchcancel",_tx,{capture:!0});'
+                'window.removeEventListener("contextmenu",_cm,{capture:!0})};'
+                'w.current=O;window.addEventListener("touchmove",_tm,{passive:!1,capture:!0});'
+                'window.addEventListener("touchend",_te,{passive:!1,capture:!0});'
+                'window.addEventListener("touchcancel",_tx,{capture:!0});'
+                'window.addEventListener("contextmenu",_cm,{capture:!0});window.addEventListener("keydown",O,!0)'
+                '}else{r.current=B;u.current=C;v.current=N;w.current=O;'
+                'window.addEventListener("pointermove",B);window.addEventListener("pointerup",C);window.addEventListener("pointercancel",N);window.addEventListener("keydown",O,!0)}}}'
+            )
+            iwin_new = iwin[:m_i.start()] + y_new + mid_and_pd_header + new_pd_body + iwin[m_i.end():]
+            content = content[:is_start] + iwin_new + content[is_end:]
+            modified = True
+
+    # 5. Render a touch drag handle grip on mobile sidebar conversation rows (b$c)
+    ts_anchor = content.find('timestamp:b==="sidebar"?"idleOnly":"always"')
+    if ts_anchor != -1:
+        rs = max(0, ts_anchor - 350)
+        re_pos = min(len(content), ts_anchor + 150)
+        rwin = content[rs:re_pos]
+        grip_re = re.compile(
+            r'(\(([A-Za-z0-9_$]+)\)\?([A-Za-z0-9_$]+):([A-Za-z0-9_$]+)\.createElement\(([A-Za-z0-9_$]+),\{cascadeId:a,timestamp:b==="sidebar"\?"idleOnly":"always"\}\)\)\))'
+            r'(?=,U\?\4\.createElement)'
+        )
+        # Simpler direct pattern around ce?se:E.createElement(da,...)
+        grip_re2 = re.compile(
+            r'(([A-Za-z0-9_$]+)\?([A-Za-z0-9_$]+):([A-Za-z0-9_$]+)\.createElement\(([A-Za-z0-9_$]+),\{cascadeId:a,timestamp:b==="sidebar"\?"idleOnly":"always"\}\))\)\)(?=,)'
+        )
+        m_g = grip_re2.search(rwin)
+        if m_g:
+            orig_ts = m_g.group(1)
+            r_id = m_g.group(4)
+            # Detect icon component (Ew / sx) nearby in b$c
+            icon_m = re.search(r'([A-Za-z0-9_$]+)\.createElement\(([A-Za-z0-9_$]+),\{name:"keep"', content[max(0, ts_anchor - 500):ts_anchor])
+            icon_comp = icon_m.group(2) if icon_m else "sx"
+            grip_jsx = (
+                f'{orig_ts},y&&b==="sidebar"&&!fd&&!h&&{r_id}.createElement("span",'
+                f'{{"data-agy-drag-handle":"true","aria-hidden":"true",'
+                f'onClick:ve=>{{ve.preventDefault();ve.stopPropagation()}},'
+                f'style:{{touchAction:"none"}},'
+                f'className:"pointer-events-auto flex items-center justify-center w-6 h-6 -my-1 -mr-1 rounded text-muted-foreground/50 active:text-foreground cursor-grab"}},'
+                f'{r_id}.createElement({icon_comp},{{name:"drag_indicator",size:15}}))))'
+            )
+            rwin_new = rwin[:m_g.start()] + grip_jsx + rwin[m_g.end():]
+            content = content[:rs] + rwin_new + content[re_pos:]
+            modified = True
+
+    if modified:
+        print("[web-patch] Successfully patched conversation folder drag-and-drop (__agDragFoldersPatch)")
+    else:
+        print("[web-patch] WARNING: conversation folder drag-and-drop patterns did not match", file=sys.stderr)
+    return content, modified
+
+
 def patch_main(file_path):
     if not os.path.isfile(file_path):
         print(f"[web-patch] file not found: {file_path}", file=sys.stderr)
         return False
 
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, "r", encoding="utf-8", newline="") as f:
         content = f.read()
 
     content, mod1 = patch_appearance(content)
@@ -518,19 +749,26 @@ def patch_main(file_path):
     content, mod5 = patch_voice_mode_worklet(content)
     content, mod6 = patch_remote_projects_startup(content)
     content, mod7 = patch_agent_stream_resync(content)
+    content, mod8 = patch_composer_plus_button(content)
+    content, mod9 = patch_conversation_drag_folders(content)
 
-    if mod1 or mod2 or mod3 or mod4 or mod5 or mod6 or mod7:
-        with open(file_path, "w", encoding="utf-8") as f:
+    if any((mod1, mod2, mod3, mod4, mod5, mod6, mod7, mod8, mod9)):
+        with open(file_path, "w", encoding="utf-8", newline="") as f:
             f.write(content)
 
     return (
         "Desktop Mode" in content
-        and "__agOpenCatalogueModal" in content
+        and "AI Models & API Keys" not in content
+        and "Skills & Plugins Catalogue" not in content
         and "__agVoiceBridge" in content
         and "__agMcpPluginsFallback" in content
         and "__agVoiceMicWorkletPatch" in content
         and "__agRemoteStartupPatch" in content
         and "__agStreamResyncPatch" in content
+        and "__agComposerPlusPatch" in content
+        and "__agDragFoldersPatch" in content
+        and "_isT=B.pointerType" in content
+        and "data-agy-drag-handle" in content
     )
 
 
